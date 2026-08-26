@@ -21,6 +21,7 @@ from .simulator import FutureRiskSimulator
 from .ranking import ActionRanker, RankedAction
 from .confidence import ConfidenceScorer
 from .explainability import ExplanationGenerator
+from .counterfactual import simulate
 
 __all__ = [
     "ThreatStateInput",
@@ -40,6 +41,7 @@ __all__ = [
     "RankedAction",
     "ConfidenceScorer",
     "ExplanationGenerator",
+    "simulate",
 ]
 
 __version__ = "1.0.0"
