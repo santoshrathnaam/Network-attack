@@ -169,3 +169,17 @@ def test_health_and_actions_endpoints(client):
     assert "NO_ACTION" in action_names
     assert "BLOCK_SOURCES" in action_names
     assert "ISOLATE_ASSET" in action_names
+
+
+def test_dashboard_html_endpoint(client):
+    """
+    Verifies that GET / and GET /dashboard serve the live HTML dashboard.
+    """
+    resp_root = client.get("/")
+    assert resp_root.status_code == 200
+    assert "text/html" in resp_root.headers.get("content-type", "")
+    assert "Future Risk Engine" in resp_root.text
+
+    resp_dash = client.get("/dashboard")
+    assert resp_dash.status_code == 200
+    assert "text/html" in resp_dash.headers.get("content-type", "")

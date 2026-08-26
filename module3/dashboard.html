@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 3: Future Risk Engine & Counterfactual Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            cyber: {
+              900: '#0a0e17',
+              800: '#111927',
+              700: '#1e293b',
+              600: '#334155',
+              accent: '#00f2fe',
+              danger: '#ef4444',
+              warning: '#f59e0b',
+              success: '#10b981',
+              neon: '#38bdf8'
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .glow-accent { box-shadow: 0 0 20px rgba(0, 242, 254, 0.15); }
+    .glow-danger { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); }
+    .glow-success { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0e17; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-cyber-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- TOP HEADER -->
+  <header class="bg-cyber-800/80 backdrop-blur border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i data-lucide="shield-alert" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-lg tracking-tight text-white">MODULE 3</span>
+            <span class="px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">Counterfactual Simulator</span>
+          </div>
+          <p class="text-xs text-slate-400">Future Risk Engine & Defensive Action Optimizer</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <div class="hidden sm:flex items-center space-x-2 bg-cyber-900/60 px-3 py-1.5 rounded-full border border-slate-800 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-300 font-mono">Engine: Online (<span id="latencyDisplay">0.5ms</span>)</span>
+        </div>
+        <a href="/docs" target="_blank" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="file-code" class="w-4 h-4 text-cyan-400"></i>
+          <span>Swagger API Docs</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- PRESET ATTACK SCENARIOS -->
+    <div class="bg-cyber-800/60 border border-slate-800 rounded-xl p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Quick Test Attack Presets (Module 2 Telemetry)</span>
+        </div>
+        <span class="text-xs text-slate-400">Click a preset to populate input & simulate</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <button onclick="loadPreset('ddos')" class="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-left transition group">
+          <div class="p-1.5 rounded bg-red-500/10 text-red-400 group-hover:bg-red-500/20">
+            <i data-lucide="flame" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-white">DDoS Attack</div>
+            <div class="text-[11px] text-slate-400 font-mono">Threat: 87% | API_GATEWAY</div>
+          </div>
+        </button>
+
+        <button onclick="loadPreset('ransomware')" class="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-left transition group">
+          <div class="p-1.5 rounded bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-white">Ransomware Outbreak</div>
+            <div class="text-[11px] text-slate-400 font-mono">Threat: 95% | DB_PRIMARY</div>
+          </div>
+        </button>
+
+        <button onclick="loadPreset('bruteforce')" class="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-left transition group">
+          <div class="p-1.5 rounded bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20">
+            <i data-lucide="key" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-white">Credential Stuffing</div>
+            <div class="text-[11px] text-slate-400 font-mono">Threat: 68% | AUTH_SERVICE</div>
+          </div>
+        </button>
+
+        <button onclick="loadPreset('exfiltration')" class="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-left transition group">
+          <div class="p-1.5 rounded bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20">
+            <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-white">Data Exfiltration</div>
+            <div class="text-[11px] text-slate-400 font-mono">Threat: 82% | CLOUD_STORAGE</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2-COLUMN MAIN WORKBENCH -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT: INBOUND TELEMETRY CONTROLS (4 cols) -->
+      <div class="lg:col-span-4 space-y-5">
+        <div class="bg-cyber-800 border border-slate-800 rounded-xl p-5 shadow-xl">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-4">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i>
+              <h2 class="font-semibold text-sm text-white">Module 2 Threat Telemetry</h2>
+            </div>
+            <span class="text-[11px] font-mono bg-slate-700/60 text-slate-300 px-2 py-0.5 rounded">Input Seed</span>
+          </div>
+
+          <form id="simulationForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+            <!-- Threat Score Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1.5">
+                <label class="text-slate-300">Threat Score (Intensity)</label>
+                <span id="threatScoreVal" class="text-cyan-400 font-mono font-bold">0.87</span>
+              </div>
+              <input type="range" id="threat_score" min="0.0" max="1.0" step="0.01" value="0.87"
+                oninput="document.getElementById('threatScoreVal').innerText = parseFloat(this.value).toFixed(2); autoSimulate();"
+                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+
+            <!-- Threat Momentum Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1.5">
+                <label class="text-slate-300">Threat Momentum (Velocity)</label>
+                <span id="threatMomentumVal" class="text-amber-400 font-mono font-bold">+0.18</span>
+              </div>
+              <input type="range" id="threat_momentum" min="-0.50" max="0.50" step="0.01" value="0.18"
+                oninput="document.getElementById('threatMomentumVal').innerText = (parseFloat(this.value) >= 0 ? '+' : '') + parseFloat(this.value).toFixed(2); autoSimulate();"
+                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400">
+            </div>
+
+            <!-- Attack Probability Slider -->
+            <div>
+              <div class="flex justify-between text-xs font-medium mb-1.5">
+                <label class="text-slate-300">Attack Probability</label>
+                <span id="attackProbVal" class="text-purple-400 font-mono font-bold">0.87</span>
+              </div>
+              <input type="range" id="attack_probability" min="0.0" max="1.0" step="0.01" value="0.87"
+                oninput="document.getElementById('attackProbVal').innerText = parseFloat(this.value).toFixed(2); autoSimulate();"
+                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-400">
+            </div>
+
+            <!-- Attack Type -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1.5">Attack Classification</label>
+              <select id="attack_type" onchange="autoSimulate()" class="w-full px-3 py-2 bg-cyber-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                <option value="DDoS" selected>DDoS (Distributed Denial of Service)</option>
+                <option value="Ransomware">Ransomware Escalation</option>
+                <option value="BruteForce">Credential Stuffing / Brute Force</option>
+                <option value="DataExfiltration">Data Exfiltration</option>
+                <option value="PortScan">Port Scanning / Reconnaissance</option>
+              </select>
+            </div>
+
+            <!-- Current Stage -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1.5">Kill-chain Stage</label>
+              <select id="current_stage" onchange="autoSimulate()" class="w-full px-3 py-2 bg-cyber-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                <option value="SCANNING" selected>SCANNING (Reconnaissance)</option>
+                <option value="INITIAL_ACCESS">INITIAL_ACCESS (Breach)</option>
+                <option value="EXECUTION">EXECUTION (Exploitation)</option>
+                <option value="LATERAL_MOVEMENT">LATERAL_MOVEMENT (Spreading)</option>
+                <option value="EXFILTRATION">EXFILTRATION (Impact)</option>
+              </select>
+            </div>
+
+            <!-- Affected Asset -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1.5">Affected Asset</label>
+              <select id="affected_asset" onchange="autoSimulate()" class="w-full px-3 py-2 bg-cyber-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                <option value="API_GATEWAY" selected>API_GATEWAY (Edge Ingress)</option>
+                <option value="DB_PRIMARY">DB_PRIMARY (Core Database)</option>
+                <option value="AUTH_SERVICE">AUTH_SERVICE (Identity & Access)</option>
+                <option value="CLOUD_STORAGE">CLOUD_STORAGE (Object Store)</option>
+                <option value="K8S_WORKER_NODE">K8S_WORKER_NODE (Cluster Compute)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold uppercase tracking-wider rounded-lg shadow-lg shadow-cyan-500/25 flex items-center justify-center space-x-2 transition">
+              <i data-lucide="play" class="w-4 h-4"></i>
+              <span>Simulate Counterfactual Futures</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- CURRENT THREAT SNAPSHOT CARD -->
+        <div class="bg-cyber-800/80 border border-slate-800 rounded-xl p-4">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+            <span>Inbound State Verified</span>
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-2.5 rounded-lg bg-cyber-900/80 border border-slate-700/50">
+              <span class="text-slate-400 block text-[11px]">Threat Level</span>
+              <span id="kpiThreatLevel" class="font-bold text-red-400 font-mono text-sm">CRITICAL</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-cyber-900/80 border border-slate-700/50">
+              <span class="text-slate-400 block text-[11px]">Kill-Chain Stage</span>
+              <span id="kpiStage" class="font-bold text-amber-400 font-mono text-sm">SCANNING</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-cyber-900/80 border border-slate-700/50">
+              <span class="text-slate-400 block text-[11px]">Target Asset</span>
+              <span id="kpiAsset" class="font-bold text-slate-200 font-mono text-xs truncate">API_GATEWAY</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-cyber-900/80 border border-slate-700/50">
+              <span class="text-slate-400 block text-[11px]">Attack Type</span>
+              <span id="kpiAttackType" class="font-bold text-cyan-400 font-mono text-xs truncate">DDOS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: SIMULATION RESULTS & OPTIMIZATION (8 cols) -->
+      <div class="lg:col-span-8 space-y-6">
+
+        <!-- TOP: OPTIMAL RECOMMENDATION HERO CARD -->
+        <div id="recommendationHero" class="bg-gradient-to-br from-cyber-800 to-slate-900 border border-emerald-500/40 rounded-xl p-5 shadow-2xl relative overflow-hidden">
+          <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div>
+              <span class="px-2.5 py-0.5 text-[11px] font-bold tracking-wide uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full">
+                Optimal Defensive Recommendation
+              </span>
+              <h3 id="recActionName" class="text-2xl font-extrabold text-white mt-1.5 flex items-center space-x-2">
+                <span>ISOLATE_ASSET</span>
+                <i data-lucide="shield-check" class="w-6 h-6 text-emerald-400"></i>
+              </h3>
+            </div>
+            <div class="text-right">
+              <div class="text-[11px] text-slate-400 uppercase tracking-wider">Engine Confidence</div>
+              <div id="recConfidence" class="text-2xl font-extrabold text-emerald-400 font-mono">93%</div>
+            </div>
+          </div>
+
+          <!-- DYNAMIC EXPLANATION BULLETS -->
+          <div class="bg-cyber-900/80 border border-slate-800 rounded-lg p-3.5 space-y-2 mb-4">
+            <div class="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Simulation-Derived Justification:</span>
+            </div>
+            <ul id="explanationList" class="space-y-1.5 text-xs text-slate-300">
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+                <span>Current threat level is critical (87%)</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+                <span>Threat momentum is increasing (+0.18)</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+                <span>Asset isolation produces the lowest projected future risk</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- CONFIDENCE BREAKDOWN TAGS -->
+          <div id="confidenceBreakdown" class="flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+            <span class="px-2 py-1 rounded bg-slate-800/80 border border-slate-700">Input Quality: <span id="confInput" class="text-cyan-400">0.95</span></span>
+            <span class="px-2 py-1 rounded bg-slate-800/80 border border-slate-700">Forecast Alignment: <span id="confForecast" class="text-purple-400">0.92</span></span>
+            <span class="px-2 py-1 rounded bg-slate-800/80 border border-slate-700">Stability: <span id="confStability" class="text-emerald-400">0.95</span></span>
+            <span class="px-2 py-1 rounded bg-slate-800/80 border border-slate-700">Efficacy Margin: <span id="confEfficacy" class="text-amber-400">0.91</span></span>
+          </div>
+        </div>
+
+        <!-- COUNTERFACTUAL HORIZON CHART -->
+        <div class="bg-cyber-800 border border-slate-800 rounded-xl p-5 shadow-xl">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+                <i data-lucide="trending-up" class="w-4 h-4 text-cyan-400"></i>
+                <span>Counterfactual Risk Trajectories (+2m, +5m, +10m)</span>
+              </h3>
+              <p class="text-xs text-slate-400">Comparing baseline inaction escalation vs. defensive interventions</p>
+            </div>
+            <div class="flex items-center space-x-4 text-xs">
+              <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-red-400 rounded"></span><span class="text-slate-300">No Action</span></span>
+              <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-amber-400 rounded"></span><span class="text-slate-300">Block Sources</span></span>
+              <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-emerald-400 rounded"></span><span class="text-slate-300">Isolate Asset</span></span>
+            </div>
+          </div>
+          <div class="h-64 w-full">
+            <canvas id="horizonChart"></canvas>
+          </div>
+        </div>
+
+        <!-- ACTION RANKING & COMPARISON TABLE -->
+        <div class="bg-cyber-800 border border-slate-800 rounded-xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+              <i data-lucide="list-ordered" class="w-4 h-4 text-cyan-400"></i>
+              <span>Defensive Action Ranking Matrix</span>
+            </h3>
+            <span class="text-xs text-slate-400">Ranked by lowest projected 10m risk</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-700 text-slate-400 uppercase tracking-wider font-mono text-[11px]">
+                  <th class="py-2.5 px-3">Rank</th>
+                  <th class="py-2.5 px-3">Defensive Action</th>
+                  <th class="py-2.5 px-3 text-center">+2 min</th>
+                  <th class="py-2.5 px-3 text-center">+5 min</th>
+                  <th class="py-2.5 px-3 text-center">+10 min</th>
+                  <th class="py-2.5 px-3 text-right">Risk Reduction (+10m)</th>
+                </tr>
+              </thead>
+              <tbody id="rankingTableBody" class="divide-y divide-slate-800 font-mono">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- HAND-OFF JSON CONTRACT TO MODULE 4 (DASHBOARD) -->
+        <div class="bg-cyber-800 border border-slate-800 rounded-xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="code-2" class="w-4 h-4 text-cyan-400"></i>
+              <h3 class="text-sm font-semibold text-white">Module 4 Hand-off Payload (Exact JSON Contract)</h3>
+            </div>
+            <button onclick="copyJsonPayload()" class="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium flex items-center space-x-1.5 transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span id="copyBtnText">Copy JSON</span>
+            </button>
+          </div>
+          <pre id="jsonOutput" class="bg-cyber-900 p-4 rounded-lg text-xs font-mono text-cyan-300 overflow-x-auto border border-slate-800 max-h-64 leading-relaxed"></pre>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- SCRIPT: APPLICATION LOGIC & REAL-TIME SIMULATION -->
+  <script>
+    let horizonChartInstance = null;
+    let latestOutputPayload = null;
+
+    // Presets
+    const presets = {
+      ddos: {
+        threat_score: 0.87,
+        threat_momentum: 0.18,
+        attack_probability: 0.87,
+        attack_type: 'DDoS',
+        current_stage: 'SCANNING',
+        affected_asset: 'API_GATEWAY'
+      },
+      ransomware: {
+        threat_score: 0.95,
+        threat_momentum: 0.35,
+        attack_probability: 0.92,
+        attack_type: 'Ransomware',
+        current_stage: 'EXECUTION',
+        affected_asset: 'DB_PRIMARY'
+      },
+      bruteforce: {
+        threat_score: 0.68,
+        threat_momentum: 0.10,
+        attack_probability: 0.75,
+        attack_type: 'BruteForce',
+        current_stage: 'INITIAL_ACCESS',
+        affected_asset: 'AUTH_SERVICE'
+      },
+      exfiltration: {
+        threat_score: 0.82,
+        threat_momentum: 0.22,
+        attack_probability: 0.88,
+        attack_type: 'DataExfiltration',
+        current_stage: 'LATERAL_MOVEMENT',
+        affected_asset: 'CLOUD_STORAGE'
+      }
+    };
+
+    function loadPreset(name) {
+      const p = presets[name];
+      if (!p) return;
+      document.getElementById('threat_score').value = p.threat_score;
+      document.getElementById('threatScoreVal').innerText = p.threat_score.toFixed(2);
+
+      document.getElementById('threat_momentum').value = p.threat_momentum;
+      document.getElementById('threatMomentumVal').innerText = (p.threat_momentum >= 0 ? '+' : '') + p.threat_momentum.toFixed(2);
+
+      document.getElementById('attack_probability').value = p.attack_probability;
+      document.getElementById('attackProbVal').innerText = p.attack_probability.toFixed(2);
+
+      document.getElementById('attack_type').value = p.attack_type;
+      document.getElementById('current_stage').value = p.current_stage;
+      document.getElementById('affected_asset').value = p.affected_asset;
+
+      runSimulation();
+    }
+
+    let autoSimTimeout = null;
+    function autoSimulate() {
+      clearTimeout(autoSimTimeout);
+      autoSimTimeout = setTimeout(runSimulation, 60);
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      runSimulation();
+    }
+
+    async function runSimulation() {
+      const payload = {
+        threat_score: parseFloat(document.getElementById('threat_score').value),
+        threat_momentum: parseFloat(document.getElementById('threat_momentum').value),
+        attack_probability: parseFloat(document.getElementById('attack_probability').value),
+        attack_type: document.getElementById('attack_type').value,
+        current_stage: document.getElementById('current_stage').value,
+        affected_asset: document.getElementById('affected_asset').value
+      };
+
+      // Update KPI cards
+      const tScore = payload.threat_score;
+      const tLevel = tScore >= 0.80 ? 'CRITICAL' : (tScore >= 0.60 ? 'HIGH' : (tScore >= 0.35 ? 'MEDIUM' : 'LOW'));
+      const tLevelElem = document.getElementById('kpiThreatLevel');
+      tLevelElem.innerText = tLevel;
+      tLevelElem.className = 'font-bold font-mono text-sm ' + (tLevel === 'CRITICAL' ? 'text-red-400' : (tLevel === 'HIGH' ? 'text-amber-400' : 'text-emerald-400'));
+
+      document.getElementById('kpiStage').innerText = payload.current_stage;
+      document.getElementById('kpiAsset').innerText = payload.affected_asset;
+      document.getElementById('kpiAttackType').innerText = payload.attack_type.toUpperCase();
+
+      const t0 = performance.now();
+
+      try {
+        const response = await fetch('/simulate/detailed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        const latency = (performance.now() - t0).toFixed(1);
+        document.getElementById('latencyDisplay').innerText = `${latency}ms`;
+
+        latestOutputPayload = data.primary;
+        renderResults(data);
+      } catch (err) {
+        console.error('Simulation error:', err);
+      }
+    }
+
+    function renderResults(data) {
+      const primary = data.primary;
+
+      // 1. Recommendation Hero
+      document.getElementById('recActionName').innerHTML = `<span>${primary.recommendation.action}</span> <i data-lucide="shield-check" class="w-6 h-6 text-emerald-400"></i>`;
+      document.getElementById('recConfidence').innerText = `${Math.round(primary.recommendation.confidence * 100)}%`;
+
+      // 2. Explanations
+      const expList = document.getElementById('explanationList');
+      expList.innerHTML = '';
+      primary.explanation.forEach(exp => {
+        const li = document.createElement('li');
+        li.className = 'flex items-start space-x-2';
+        li.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i><span>${exp}</span>`;
+        expList.appendChild(li);
+      });
+
+      // 3. Confidence breakdown
+      if (data.confidence_breakdown) {
+        document.getElementById('confInput').innerText = data.confidence_breakdown.input_quality;
+        document.getElementById('confForecast').innerText = data.confidence_breakdown.forecast_confidence;
+        document.getElementById('confStability').innerText = data.confidence_breakdown.simulation_stability;
+        document.getElementById('confEfficacy').innerText = data.confidence_breakdown.action_efficacy_margin;
+      }
+
+      // 4. Chart Render
+      renderChart(primary.scenarios, primary.current_state.threat_score);
+
+      // 5. Ranking Table
+      const tbody = document.getElementById('rankingTableBody');
+      tbody.innerHTML = '';
+
+      const detailedScenarios = data.detailed_scenarios || [];
+      detailedScenarios.forEach((sc, idx) => {
+        const isRec = sc.is_recommended;
+        const tr = document.createElement('tr');
+        tr.className = isRec ? 'bg-emerald-500/10 text-emerald-300 font-semibold' : 'hover:bg-slate-800/40 text-slate-300';
+        
+        const rankBadge = isRec 
+          ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">#${sc.rank} WINNER</span>`
+          : `<span class="text-slate-400">#${sc.rank}</span>`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-3">${rankBadge}</td>
+          <td class="py-3 px-3 font-bold ${isRec ? 'text-emerald-300' : 'text-slate-200'}">${sc.action}</td>
+          <td class="py-3 px-3 text-center">${(sc.risk['2m'] * 100).toFixed(0)}%</td>
+          <td class="py-3 px-3 text-center">${(sc.risk['5m'] * 100).toFixed(0)}%</td>
+          <td class="py-3 px-3 text-center">${(sc.risk['10m'] * 100).toFixed(0)}%</td>
+          <td class="py-3 px-3 text-right ${sc.risk_reduction_pct_10m > 0 ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+            ${sc.risk_reduction_pct_10m > 0 ? '+' + sc.risk_reduction_pct_10m.toFixed(0) + '%' : '0%'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // 6. JSON Contract Output
+      document.getElementById('jsonOutput').innerText = JSON.stringify(primary, null, 2);
+
+      // Re-initialize Lucide icons
+      lucide.createIcons();
+    }
+
+    function renderChart(scenarios, initialRisk) {
+      const ctx = document.getElementById('horizonChart').getContext('2d');
+      const labels = ['Current (Now)', '+2 min', '+5 min', '+10 min'];
+
+      const colorMap = {
+        'NO_ACTION': { border: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+        'BLOCK_SOURCES': { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+        'ISOLATE_ASSET': { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+        'RATE_LIMIT': { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' }
+      };
+
+      const datasets = scenarios.map(sc => {
+        const c = colorMap[sc.action] || { border: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)' };
+        return {
+          label: sc.action,
+          data: [initialRisk, sc.risk['2m'], sc.risk['5m'], sc.risk['10m']],
+          borderColor: c.border,
+          backgroundColor: c.bg,
+          borderWidth: sc.action === 'ISOLATE_ASSET' ? 3 : 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.35,
+          fill: sc.action === 'ISOLATE_ASSET'
+        };
+      });
+
+      if (horizonChartInstance) {
+        horizonChartInstance.destroy();
+      }
+
+      horizonChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              min: 0,
+              max: 1.0,
+              ticks: {
+                color: '#94a3b8',
+                callback: val => (val * 100).toFixed(0) + '%'
+              },
+              grid: { color: 'rgba(51, 65, 85, 0.4)' }
+            },
+            x: {
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } },
+              grid: { color: 'rgba(51, 65, 85, 0.4)' }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1e293b',
+              titleColor: '#e2e8f0',
+              bodyColor: '#f8fafc',
+              borderColor: '#475569',
+              borderWidth: 1,
+              callbacks: {
+                label: ctx => ` ${ctx.dataset.label}: ${(ctx.parsed.y * 100).toFixed(1)}% risk`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function copyJsonPayload() {
+      if (!latestOutputPayload) return;
+      navigator.clipboard.writeText(JSON.stringify(latestOutputPayload, null, 2));
+      const btn = document.getElementById('copyBtnText');
+      btn.innerText = 'Copied!';
+      setTimeout(() => { btn.innerText = 'Copy JSON'; }, 2000);
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      runSimulation();
+    });
+  </script>
+</body>
+</html>

@@ -6,12 +6,13 @@ Accepts Module 2 threat forecasts, executes counterfactual risk simulations,
 and delivers the exact JSON payload expected by Module 4.
 """
 
+import os
 import time
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 
 from .schemas import (
     ThreatStateInput,
@@ -212,8 +213,34 @@ def execute_module3_pipeline(
 
 
 # ==============================================================================
-# API Endpoints
+# Web Dashboard & API Endpoints
 # ==============================================================================
+
+@app.get(
+    "/",
+    response_class=HTMLResponse,
+    summary="Interactive Cyber Defense & Simulation Dashboard",
+    include_in_schema=False
+)
+@app.get(
+    "/dashboard",
+    response_class=HTMLResponse,
+    summary="Interactive Cyber Defense & Simulation Dashboard",
+    tags=["Dashboard"]
+)
+async def serve_dashboard():
+    """
+    Renders the live interactive Module 3 Cyber Defense Simulation Dashboard.
+    """
+    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    return HTMLResponse(
+        content="<h2>Dashboard template not found. Please visit /docs for API endpoints.</h2>",
+        status_code=404
+    )
+
 
 @app.post(
     "/simulate",
