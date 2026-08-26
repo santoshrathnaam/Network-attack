@@ -105,4 +105,22 @@ npm run build
 ```
 Output files will be generated in `dist/`.
 
+---
+
+## 🎬 Programmatic Demo Video Generation (HyperFrames + TTS Voiceover)
+
+The system includes a 55-second high-definition programmatic demo video generated using [HyperFrames](https://github.com/heygen-com/hyperframes) and neural Text-to-Speech voiceovers.
+
+### Generate / Render Video:
+1. Ensure TTS voiceover clips are generated:
+   ```bash
+   python generate_tts.py
+   ```
+2. Render the HyperFrames MP4 composition:
+   ```bash
+   python render_video.py
+   ```
+*The output video is generated at `predictive_cyber_defense_demo.mp4`.*
+
+
 

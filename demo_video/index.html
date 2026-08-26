@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>SIH26153 - Predictive Cyber Defense Demo Video</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #090A0C;
+        color: #F5F5F7;
+        font-family: 'Inter', sans-serif;
+      }
+      .mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        background: radial-gradient(circle at 50% 20%, #151A26 0%, #090A0C 70%);
+      }
+      
+      /* Common Clip Styling */
+      .clip {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1920px;
+        height: 1080px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 80px;
+      }
+
+      .scene-inner {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+
+      /* Glowing UI Glass Panels */
+      .glass-card {
+        background: rgba(21, 26, 38, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+        border-radius: 24px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      }
+      .glass-card-glow {
+        background: rgba(21, 26, 38, 0.75);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        backdrop-filter: blur(16px);
+        border-radius: 24px;
+        box-shadow: 0 0 40px rgba(239, 68, 68, 0.2);
+      }
+
+      /* Scene 1 Styles */
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 20px;
+        border-radius: 9999px;
+        background: rgba(59, 130, 246, 0.15);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: #60A5FA;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 24px;
+      }
+      .hero-title {
+        font-size: 64px;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        background: linear-gradient(135deg, #FFFFFF 0%, #94A3B8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      .hero-subtitle {
+        font-size: 24px;
+        color: #94A3B8;
+        max-width: 900px;
+        text-align: center;
+        line-height: 1.6;
+        margin-bottom: 48px;
+      }
+      .pillars-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+        width: 100%;
+        max-width: 1400px;
+      }
+      .pillar-item {
+        padding: 24px;
+        text-align: left;
+      }
+      .pillar-num {
+        font-size: 14px;
+        color: #3B82F6;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .pillar-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #F8FAFC;
+        margin-bottom: 6px;
+      }
+      .pillar-desc {
+        font-size: 13px;
+        color: #64748B;
+        line-height: 1.5;
+      }
+
+      /* Scene 2 Styles */
+      .scene-header {
+        width: 100%;
+        max-width: 1500px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+      }
+      .scene-title {
+        font-size: 32px;
+        font-weight: 800;
+      }
+      .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        width: 100%;
+        max-width: 1500px;
+        margin-bottom: 32px;
+      }
+      .metric-card {
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .metric-label {
+        font-size: 14px;
+        color: #94A3B8;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .metric-value {
+        font-size: 48px;
+        font-weight: 900;
+        color: #EF4444;
+      }
+      .metric-sub {
+        font-size: 13px;
+        color: #64748B;
+      }
+
+      /* Trajectory Stepper */
+      .trajectory-container {
+        width: 100%;
+        max-width: 1500px;
+        padding: 32px;
+      }
+      .stepper-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        margin-top: 16px;
+      }
+      .step-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        z-index: 2;
+      }
+      .step-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #1E293B;
+        border: 2px solid #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        color: #94A3B8;
+      }
+      .step-circle.active {
+        background: #EF4444;
+        border-color: #F87171;
+        color: #FFF;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+      }
+      .step-circle.passed {
+        background: #10B981;
+        border-color: #34D399;
+        color: #FFF;
+      }
+      .step-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: #94A3B8;
+      }
+      .step-name.active {
+        color: #EF4444;
+      }
+
+      /* Scene 3 Styles - SHAP Attribution */
+      .attribution-list {
+        width: 100%;
+        max-width: 1400px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .attr-card {
+        padding: 24px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .attr-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: 300px;
+      }
+      .attr-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: #F8FAFC;
+      }
+      .attr-shift {
+        font-size: 13px;
+        color: #EF4444;
+        font-weight: 600;
+      }
+      .attr-bar-container {
+        flex: 1;
+        height: 16px;
+        background: #1E293B;
+        border-radius: 999px;
+        margin: 0 32px;
+        overflow: hidden;
+        position: relative;
+      }
+      .attr-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #F59E0B, #EF4444);
+        border-radius: 999px;
+        width: 0%;
+      }
+      .attr-share {
+        font-size: 20px;
+        font-weight: 800;
+        color: #F8FAFC;
+        width: 100px;
+        text-align: right;
+      }
+
+      /* Scene 4 Styles - Counterfactual Simulation */
+      .scenarios-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px;
+        width: 100%;
+        max-width: 1500px;
+        margin-bottom: 32px;
+      }
+      .scenario-card {
+        padding: 40px 32px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 320px;
+      }
+      .scenario-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: #F8FAFC;
+      }
+      .scenario-risk {
+        font-size: 64px;
+        font-weight: 900;
+      }
+      .rec-banner {
+        width: 100%;
+        max-width: 1500px;
+        padding: 24px 32px;
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+        border: 1px solid #10B981;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .rec-text {
+        font-size: 20px;
+        font-weight: 800;
+        color: #34D399;
+      }
+      .rec-value {
+        font-size: 28px;
+        font-weight: 900;
+        color: #10B981;
+      }
+
+      /* Scene 5 Styles - Wrap-up */
+      .pipeline-chain {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 48px;
+      }
+      .module-box {
+        padding: 24px 32px;
+        text-align: center;
+      }
+      .module-tag {
+        font-size: 12px;
+        color: #60A5FA;
+        font-weight: 700;
+      }
+      .module-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #FFF;
+      }
+      .arrow {
+        font-size: 24px;
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="55" data-width="1920" data-height="1080">
+      <!-- Audio Narration Clips -->
+      <audio id="audio1" data-start="0.5" data-duration="12.0" src="assets/audio_scene1.mp3"></audio>
+      <audio id="audio2" data-start="13.0" data-duration="10.1" src="assets/audio_scene2.mp3"></audio>
+      <audio id="audio3" data-start="23.5" data-duration="10.4" src="assets/audio_scene3.mp3"></audio>
+      <audio id="audio4" data-start="34.5" data-duration="10.1" src="assets/audio_scene4.mp3"></audio>
+      <audio id="audio5" data-start="45.0" data-duration="8.7" src="assets/audio_scene5.mp3"></audio>
+      
+      <!-- SCENE 1: Title & Mission (0s - 13s) -->
+      <div id="scene1" class="clip" data-start="0" data-duration="13">
+        <div id="scene1-inner" class="scene-inner">
+          <div id="scene1-badge" class="badge-pill">SIH26153 • NTRO • NETWORK INTELLIGENCE</div>
+          <h1 id="scene1-title" class="hero-title">PREDICTIVE CYBER DEFENSE</h1>
+          <p id="scene1-sub" class="hero-subtitle">AI-Based Network Attack Forecasting & Proactive Threat Mitigation System</p>
+          
+          <div id="scene1-grid" class="pillars-grid">
+            <div id="pillar1" class="glass-card pillar-item">
+              <div class="pillar-num">MODULE 1</div>
+              <div class="pillar-title">Traffic Intelligence</div>
+              <div class="pillar-desc">Extracts flow features & z-score anomaly indicators.</div>
+            </div>
+            <div id="pillar2" class="glass-card pillar-item">
+              <div class="pillar-num">MODULE 2</div>
+              <div class="pillar-title">Threat Forecasting</div>
+              <div class="pillar-desc">Predicts Threat Momentum & 5-stage attack trajectory.</div>
+            </div>
+            <div id="pillar3" class="glass-card pillar-item">
+              <div class="pillar-num">MODULE 3</div>
+              <div class="pillar-title">Future Risk Engine</div>
+              <div class="pillar-desc">Simulates counterfactuals & ranks defensive actions.</div>
+            </div>
+            <div id="pillar4" class="glass-card pillar-item">
+              <div class="pillar-num">MODULE 4</div>
+              <div class="pillar-title">SOC Command UI</div>
+              <div class="pillar-desc">High-performance React dashboard with SHAP explainability.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 2: Traffic Intelligence & Threat Forecasting (13s - 23.5s) -->
+      <div id="scene2" class="clip" data-start="13" data-duration="10.5">
+        <div id="scene2-inner" class="scene-inner">
+          <div id="scene2-header" class="scene-header">
+            <h2 class="scene-title">MODULE 1 & 2: LIVE THREAT FORECASTING</h2>
+            <div class="badge-pill" style="margin-bottom:0; background:rgba(239,68,68,0.2); color:#F87171; border-color:rgba(239,68,68,0.4)">CRITICAL ALERT</div>
+          </div>
+
+          <div id="scene2-metrics" class="metrics-row">
+            <div class="glass-card-glow metric-card">
+              <span class="metric-label">Threat Score</span>
+              <span class="metric-value mono">87%</span>
+              <span class="metric-sub">Weighted anomaly vector</span>
+            </div>
+            <div class="glass-card-glow metric-card">
+              <span class="metric-label">Threat Momentum</span>
+              <span class="metric-value mono" style="color:#F59E0B">+18/min</span>
+              <span class="metric-sub">Temporal acceleration rate</span>
+            </div>
+            <div class="glass-card-glow metric-card">
+              <span class="metric-label">Time to Escalation</span>
+              <span class="metric-value mono" style="color:#3B82F6">~5 min</span>
+              <span class="metric-sub">Estimated band: 4 - 6 mins</span>
+            </div>
+          </div>
+
+          <div id="scene2-stepper" class="glass-card trajectory-container">
+            <span class="metric-label">Attack Trajectory Progression Stepper</span>
+            <div class="stepper-flex">
+              <div class="step-item">
+                <div class="step-circle passed">✓</div>
+                <span class="step-name">NORMAL</span>
+              </div>
+              <div class="step-item">
+                <div class="step-circle passed">✓</div>
+                <span class="step-name">ANOMALY</span>
+              </div>
+              <div class="step-item">
+                <div class="step-circle passed">✓</div>
+                <span class="step-name">SCANNING</span>
+              </div>
+              <div class="step-item">
+                <div class="step-circle active">4</div>
+                <span class="step-name active">ATTACK IMMINENT</span>
+              </div>
+              <div class="step-item">
+                <div class="step-circle">5</div>
+                <span class="step-name">DDoS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 3: Explainable AI & Telemetry Attribution (23.5s - 34.5s) -->
+      <div id="scene3" class="clip" data-start="23.5" data-duration="11">
+        <div id="scene3-inner" class="scene-inner">
+          <div id="scene3-header" class="scene-header">
+            <h2 class="scene-title">MODULE 2 EXPLAINABILITY: SHAP TELEMETRY ATTRIBUTION</h2>
+            <span style="color:#94A3B8; font-size:14px">Measurable network shifts driving risk model</span>
+          </div>
+
+          <div id="scene3-list" class="attribution-list">
+            <div class="glass-card attr-card">
+              <div class="attr-info">
+                <span class="attr-name">SYN Traffic Ratio</span>
+                <span class="attr-shift">1.2k pkts/s → 4.85k pkts/s (+68%)</span>
+              </div>
+              <div class="attr-bar-container">
+                <div class="attr-bar-fill" id="bar1" style="width: 32.4%;"></div>
+              </div>
+              <span class="attr-share mono">32.4%</span>
+            </div>
+
+            <div class="glass-card attr-card">
+              <div class="attr-info">
+                <span class="attr-name">Failed Connection Rate</span>
+                <span class="attr-shift">14 conn/s → 128 conn/s (+72%)</span>
+              </div>
+              <div class="attr-bar-container">
+                <div class="attr-bar-fill" id="bar2" style="width: 20.2%;"></div>
+              </div>
+              <span class="attr-share mono">20.2%</span>
+            </div>
+
+            <div class="glass-card attr-card">
+              <div class="attr-info">
+                <span class="attr-name">Traffic Volume Spike</span>
+                <span class="attr-shift">240 Mb/s → 850 Mb/s (+61%)</span>
+              </div>
+              <div class="attr-bar-container">
+                <div class="attr-bar-fill" id="bar3" style="width: 19.8%;"></div>
+              </div>
+              <span class="attr-share mono">19.8%</span>
+            </div>
+
+            <div class="glass-card attr-card">
+              <div class="attr-info">
+                <span class="attr-name">Unique Source IPs</span>
+                <span class="attr-shift">420 hosts → 1.92k hosts (+54%)</span>
+              </div>
+              <div class="attr-bar-container">
+                <div class="attr-bar-fill" id="bar4" style="width: 18.4%;"></div>
+              </div>
+              <span class="attr-share mono">18.4%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 4: Counterfactual Simulation (34.5s - 45s) -->
+      <div id="scene4" class="clip" data-start="34.5" data-duration="10.5">
+        <div id="scene4-inner" class="scene-inner">
+          <div id="scene4-header" class="scene-header">
+            <h2 class="scene-title">MODULE 3: COUNTERFACTUAL FUTURE RISK ENGINE</h2>
+            <span style="color:#94A3B8; font-size:14px">5-Minute Horizon Risk Projections under Candidate Actions</span>
+          </div>
+
+          <div id="scene4-grid" class="scenarios-grid">
+            <div class="glass-card scenario-card" style="border-color: rgba(239,68,68,0.4)">
+              <span class="scenario-title">NO ACTION</span>
+              <span class="scenario-risk mono" style="color:#EF4444">93%</span>
+              <span style="color:#94A3B8; font-size:13px">Escalates to total saturation</span>
+            </div>
+
+            <div class="glass-card scenario-card" style="border-color: rgba(245,158,11,0.4)">
+              <span class="scenario-title">BLOCK SOURCES</span>
+              <span class="scenario-risk mono" style="color:#F59E0B">39%</span>
+              <span style="color:#94A3B8; font-size:13px">Filters ingress suspicious IPs</span>
+            </div>
+
+            <div class="glass-card-glow scenario-card" style="border-color: #10B981; background: rgba(16,185,129,0.1)">
+              <span class="scenario-title" style="color:#34D399">ISOLATE SERVER (RECOMMENDED)</span>
+              <span class="scenario-risk mono" style="color:#10B981">24%</span>
+              <span style="color:#34D399; font-size:13px">Sinkholes ingress & isolates node</span>
+            </div>
+          </div>
+
+          <div id="scene4-banner" class="rec-banner">
+            <span class="rec-text">RECOMMENDED INTERVENTION: ISOLATE AFFECTED SERVER</span>
+            <span class="rec-value mono">PROJECTED RISK REDUCTION: -73%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 5: End-to-End Pipeline & Conclusion (45s - 55s) -->
+      <div id="scene5" class="clip" data-start="45" data-duration="10">
+        <div id="scene5-inner" class="scene-inner">
+          <div id="scene5-badge" class="badge-pill">SIH26153 • FINAL PROTOTYPE DEMO</div>
+          <h1 id="scene5-title" class="hero-title">UNIFIED 4-MODULE PIPELINE</h1>
+          
+          <div id="scene5-chain" class="pipeline-chain">
+            <div class="glass-card module-box">
+              <span class="module-tag">MODULE 1</span>
+              <div class="module-title">Traffic Analysis</div>
+            </div>
+            <span class="arrow">➔</span>
+            <div class="glass-card module-box">
+              <span class="module-tag">MODULE 2</span>
+              <div class="module-title">Threat Forecast</div>
+            </div>
+            <span class="arrow">➔</span>
+            <div class="glass-card module-box">
+              <span class="module-tag">MODULE 3</span>
+              <div class="module-title">Risk Engine</div>
+            </div>
+            <span class="arrow">➔</span>
+            <div class="glass-card module-box">
+              <span class="module-tag">MODULE 4</span>
+              <div class="module-title">SOC Command UI</div>
+            </div>
+          </div>
+
+          <div id="scene5-status" class="badge-pill" style="background: rgba(16,185,129,0.15); color: #34D399; border-color: rgba(16,185,129,0.4); font-size: 16px; padding: 12px 28px;">
+            ● 100% TEST SUITE VERIFIED & CONTRACT READY
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Scene 1 Animations (0s - 13s)
+      tl.from("#scene1-inner", { opacity: 0, scale: 0.95, duration: 0.8 }, 0.2);
+      tl.from("#scene1-grid .pillar-item", { opacity: 0, y: 30, duration: 0.8, stagger: 0.15 }, 1.0);
+
+      // Scene 2 Animations (13s - 23.5s)
+      tl.from("#scene2-inner", { opacity: 0, scale: 0.95, duration: 0.8 }, 13.0);
+      tl.from("#scene2-metrics .metric-card", { opacity: 0, scale: 0.9, duration: 0.6, stagger: 0.15 }, 13.5);
+      tl.from("#scene2-stepper", { opacity: 0, y: 20, duration: 0.6 }, 14.5);
+
+      // Scene 3 Animations (23.5s - 34.5s)
+      tl.from("#scene3-inner", { opacity: 0, scale: 0.95, duration: 0.8 }, 23.5);
+      tl.from("#scene3-list .attr-card", { opacity: 0, x: -30, duration: 0.6, stagger: 0.15 }, 24.0);
+
+      // Scene 4 Animations (34.5s - 45s)
+      tl.from("#scene4-inner", { opacity: 0, scale: 0.95, duration: 0.8 }, 34.5);
+      tl.from("#scene4-grid .scenario-card", { opacity: 0, y: 30, duration: 0.6, stagger: 0.15 }, 35.0);
+      tl.from("#scene4-banner", { opacity: 0, scale: 0.95, duration: 0.6 }, 36.5);
+
+      // Scene 5 Animations (45s - 55s)
+      tl.from("#scene5-inner", { opacity: 0, scale: 0.95, duration: 0.8 }, 45.0);
+      tl.from("#scene5-chain .module-box", { opacity: 0, y: 20, duration: 0.6, stagger: 0.15 }, 45.5);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
