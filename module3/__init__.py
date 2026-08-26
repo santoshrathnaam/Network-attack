@@ -21,6 +21,7 @@ from .simulator import FutureRiskSimulator
 from .ranking import ActionRanker, RankedAction
 from .confidence import ConfidenceScorer
 from .explainability import ExplanationGenerator
+from .api import execute_module3_pipeline
 from .counterfactual import simulate
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "RankedAction",
     "ConfidenceScorer",
     "ExplanationGenerator",
+    "execute_module3_pipeline",
     "simulate",
 ]
 
