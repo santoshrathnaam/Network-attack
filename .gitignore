@@ -30,3 +30,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+__pycache__/
+*.pyc
+.venv/
+venv/
