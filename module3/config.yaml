@@ -1,0 +1,97 @@
+# Module 3: Future Risk Engine & Counterfactual Simulator Configuration
+# All tunable simulation coefficients, action parameters, and stage transitions are defined here.
+
+# Prediction Horizons
+simulation:
+  horizons:
+    - "2m"
+    - "5m"
+    - "10m"
+  horizon_minutes:
+    "2m": 2.0
+    "5m": 5.0
+    "10m": 10.0
+  primary_horizon: "10m"
+  clamp_min: 0.0
+  clamp_max: 1.0
+
+# Action Efficacy Coefficients (Defensive Effects per minute and base effect)
+action_effects:
+  NO_ACTION:
+    base_effect: 0.0
+    rate_per_min: 0.0
+    description: "Baseline - defender takes no action, allowing threat escalation"
+    enabled: true
+
+  BLOCK_SOURCES:
+    base_effect: 0.12
+    rate_per_min: 0.065
+    description: "Block suspicious external IP addresses and malicious sources"
+    enabled: true
+
+  ISOLATE_ASSET:
+    base_effect: 0.25
+    rate_per_min: 0.085
+    description: "Quarantine and isolate the affected host/server from internal network"
+    enabled: true
+
+  # Future-extensible actions
+  RATE_LIMIT:
+    base_effect: 0.08
+    rate_per_min: 0.045
+    description: "Apply strict API and network rate limiting on incoming traffic"
+    enabled: false
+
+  BLOCK_PORT:
+    base_effect: 0.10
+    rate_per_min: 0.055
+    description: "Close specific exposed port and protocols under targeted attack"
+    enabled: false
+
+  DISABLE_ACCOUNT:
+    base_effect: 0.15
+    rate_per_min: 0.060
+    description: "Temporarily disable compromised user credentials and active sessions"
+    enabled: false
+
+  REDIRECT_TRAFFIC:
+    base_effect: 0.10
+    rate_per_min: 0.050
+    description: "Divert suspicious traffic to honeypot or scrubbing center"
+    enabled: false
+
+# Simulation Dynamics Parameters
+dynamics:
+  baseline_growth_rate_per_min: 0.010
+  momentum_factor: 0.055
+  stage_progression_factor: 0.015
+  decay_damping_factor: 0.92
+
+# Attack Stage Transition Model (Probabilistic stage transitions)
+stage_transitions:
+  SCANNING:
+    INITIAL_ACCESS: 0.72
+    LATERAL_MOVEMENT: 0.20
+    NO_ESCALATION: 0.08
+  INITIAL_ACCESS:
+    EXECUTION: 0.65
+    LATERAL_MOVEMENT: 0.25
+    NO_ESCALATION: 0.10
+  EXECUTION:
+    LATERAL_MOVEMENT: 0.60
+    EXFILTRATION: 0.30
+    NO_ESCALATION: 0.10
+  LATERAL_MOVEMENT:
+    EXFILTRATION: 0.75
+    NO_ESCALATION: 0.25
+  EXFILTRATION:
+    EXFILTRATION: 0.90
+    NO_ESCALATION: 0.10
+
+# Confidence Scoring Weights
+confidence_scoring:
+  input_quality_weight: 0.25
+  forecast_confidence_weight: 0.35
+  stability_weight: 0.20
+  action_efficacy_weight: 0.20
+  base_stability_threshold: 0.95
