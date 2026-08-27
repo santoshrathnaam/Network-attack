@@ -1,20 +1,24 @@
-﻿import React, { useState } from 'react';
-import { SimulationData, InterventionAction } from '../../types/cyberDefense';
+import React, { useState } from 'react';
+import { SimulationData, InterventionAction, CyberDefenseState } from '../../types/cyberDefense';
 import { Card } from '../common/Card';
-import { Sparkles, ArrowRight, ShieldCheck, ShieldAlert, Zap, Server, Filter } from 'lucide-react';
+import { NetworkTopologyMap } from '../network/NetworkTopologyMap';
+import { Sparkles, ArrowRight, ShieldCheck, ShieldAlert, Zap, Server, Eye, Layers } from 'lucide-react';
 
 interface FutureSimulationPanelProps {
   simulation: SimulationData;
+  state?: CyberDefenseState;
   onSimulateClick: () => void;
   onSelectAction?: (action: InterventionAction) => void;
 }
 
 export const FutureSimulationPanel: React.FC<FutureSimulationPanelProps> = ({
   simulation,
+  state,
   onSimulateClick,
   onSelectAction
 }) => {
   const [selectedAction, setSelectedAction] = useState<InterventionAction>('ISOLATE_SERVER');
+  const [showTopologyPreview, setShowTopologyPreview] = useState<boolean>(true);
 
   const handleActionChange = (action: InterventionAction) => {
     setSelectedAction(action);
@@ -43,7 +47,7 @@ export const FutureSimulationPanel: React.FC<FutureSimulationPanelProps> = ({
 
   return (
     <Card
-      title="Future Simulation"
+      title="Future Simulation & Topology Matrix"
       subtitle="Counterfactual future modeling under distinct tactical interventions"
       badge={
         <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
@@ -51,13 +55,22 @@ export const FutureSimulationPanel: React.FC<FutureSimulationPanelProps> = ({
         </span>
       }
       action={
-        <button
-          onClick={onSimulateClick}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-white shadow-apple-sm transition-all"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Simulate Response</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowTopologyPreview((prev) => !prev)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all font-mono"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>{showTopologyPreview ? 'Hide Map' : 'Show Map'}</span>
+          </button>
+          <button
+            onClick={onSimulateClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-white shadow-apple-sm transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Simulate Modal</span>
+          </button>
+        </div>
       }
     >
       <div className="space-y-4 pt-1">
@@ -115,6 +128,18 @@ export const FutureSimulationPanel: React.FC<FutureSimulationPanelProps> = ({
             <div className="text-[10px] text-neutral-400">Future Risk</div>
           </button>
         </div>
+
+        {/* Embedded Topology View when preview toggle is enabled */}
+        {showTopologyPreview && state && (
+          <div className="rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm">
+            <NetworkTopologyMap
+              state={state}
+              selectedAction={selectedAction}
+              height="h-[320px]"
+              compact={true}
+            />
+          </div>
+        )}
 
         {/* Recommended Action Card */}
         <div className="p-4 rounded-xl bg-neutral-50 dark:bg-[#161922] border border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -187,3 +212,4 @@ export const FutureSimulationPanel: React.FC<FutureSimulationPanelProps> = ({
     </Card>
   );
 };
+

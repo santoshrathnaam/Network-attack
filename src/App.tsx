@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { CyberDefenseState, DataSourceMode } from './types/cyberDefense';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CyberDefenseState, DataSourceMode, InterventionAction } from './types/cyberDefense';
 import { cyberDefenseApi } from './services/cyberDefenseApi';
 import { replayEngine, PlaybackMode } from './services/replayEngine';
 import { TopStatusBar } from './components/header/TopStatusBar';
@@ -11,6 +11,9 @@ import { AttackTrajectoryPipeline } from './components/forecast/AttackTrajectory
 import { ExplainabilityPanel } from './components/explainability/ExplainabilityPanel';
 import { FutureSimulationPanel } from './components/simulation/FutureSimulationPanel';
 import { ResponseSimulationModal } from './components/simulation/ResponseSimulationModal';
+import { NetworkTopologyMap, TopologyNode, AttackVectorType } from './components/network/NetworkTopologyMap';
+import { NodeInspectorDrawer } from './components/network/NodeInspectorDrawer';
+import { AttackInjectorWidget } from './components/network/AttackInjectorWidget';
 import { Layers, Shield, Cpu, Activity, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export function App() {
@@ -25,6 +28,11 @@ export function App() {
   const [isSimulationModalOpen, setIsSimulationModalOpen] = useState<boolean>(false);
   const [isReplayDrawerOpen, setIsReplayDrawerOpen] = useState<boolean>(true);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Network Topology & Inspector State
+  const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
+  const [activeVector, setActiveVector] = useState<AttackVectorType>('DDOS');
+  const [selectedTacticalAction, setSelectedTacticalAction] = useState<InterventionAction>('ISOLATE_SERVER');
 
   // Sync theme with HTML document class
   useEffect(() => {
@@ -64,6 +72,7 @@ export function App() {
 
   const handleReset = () => {
     replayEngine.reset();
+    setSelectedTacticalAction('NO_ACTION');
     showNotification('Reset to Stage 4 (Attack Imminent Scenario)');
   };
 
@@ -77,6 +86,9 @@ export function App() {
 
   const handleJumpToStage = (index: number) => {
     replayEngine.jumpToStage(index);
+    if (index === 5) {
+      setSelectedTacticalAction('ISOLATE_SERVER');
+    }
   };
 
   const handleSetSpeed = (spd: number) => {
@@ -102,7 +114,14 @@ export function App() {
   const handleApplyMitigation = () => {
     // Transition to Stage 6 (Mitigated state)
     replayEngine.jumpToStage(5);
+    setSelectedTacticalAction('ISOLATE_SERVER');
     showNotification('Intervention Executed: Server Isolated. Risk reduced to 18%.');
+  };
+
+  const handleInjectVector = (vector: AttackVectorType, msg: string) => {
+    setActiveVector(vector);
+    if (vector === 'DDOS') setSelectedTacticalAction('NO_ACTION');
+    showNotification(`[SCENARIO INJECTED] ${msg}`);
   };
 
   const showNotification = (msg: string) => {
@@ -163,7 +182,24 @@ export function App() {
           <ThreatSummaryCards threat={state.threat} networkStatus={state.network_status} />
         </section>
 
-        {/* Section 2: Real-time Traffic Activity & Attack Forecast Distribution */}
+        {/* Section 2: Full-Spectrum Network Topology Canvas & Interactive Scenario Injector */}
+        <section aria-label="Interactive Network Topology" className="space-y-4">
+          <NetworkTopologyMap
+            state={state}
+            selectedAction={selectedTacticalAction}
+            activeAttackVector={activeVector}
+            onSelectNode={(node) => setSelectedNode(node)}
+            height="h-[520px]"
+          />
+
+          <AttackInjectorWidget
+            onInjectVector={handleInjectVector}
+            onApplyMitigation={handleApplyMitigation}
+            onResetTopology={handleReset}
+          />
+        </section>
+
+        {/* Section 3: Real-time Traffic Activity & Attack Forecast Distribution */}
         <section aria-label="Network Activity and Forecast" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: 2 Columns on Desktop for Traffic Chart */}
           <div className="lg:col-span-2">
@@ -179,12 +215,12 @@ export function App() {
           </div>
         </section>
 
-        {/* Section 3: Attack Trajectory Progression Stepper */}
+        {/* Section 4: Attack Trajectory Progression Stepper */}
         <section aria-label="Attack Trajectory">
           <AttackTrajectoryPipeline trajectory={state.trajectory} />
         </section>
 
-        {/* Section 4: Explainability & Future Simulation Panels */}
+        {/* Section 5: Explainability & Future Simulation Panels */}
         <section aria-label="Explainability and Simulation" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Why this forecast? */}
           <div>
@@ -195,11 +231,20 @@ export function App() {
           <div>
             <FutureSimulationPanel
               simulation={state.simulation}
+              state={state}
               onSimulateClick={() => setIsSimulationModalOpen(true)}
+              onSelectAction={(action) => setSelectedTacticalAction(action)}
             />
           </div>
         </section>
       </main>
+
+      {/* Slide-Out Node Telemetry Inspector Drawer */}
+      <NodeInspectorDrawer
+        node={selectedNode}
+        onClose={() => setSelectedNode(null)}
+        onApplyAction={(act) => showNotification(`[POLICY APPLIED] ${act}`)}
+      />
 
       {/* Counterfactual Response Simulation Modal Flow */}
       <ResponseSimulationModal
@@ -233,3 +278,4 @@ export function App() {
 }
 
 export default App;
+

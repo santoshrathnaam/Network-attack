@@ -1,0 +1,167 @@
+================================================================================
+SIH26153: AI-BASED NETWORK ATTACK FORECASTING & COUNTERFACTUAL CYBER DEFENSE
+PROJECT WORKFLOW & MODULE ARCHITECTURE DOCUMENTATION
+================================================================================
+
+1. EXECUTIVE SUMMARY & OVERVIEW
+--------------------------------------------------------------------------------
+This project implements the SIH26153 Predictive Cyber Defense System designed 
+for Security Operations Center (SOC) environments. Traditional Cyber Defense 
+systems rely on reactive Intrusion Detection Systems (IDS) that trigger alerts 
+only after an attack is already in progress. 
+
+This system shifts defense from REACTIVE to PROACTIVE by continuously:
+  1. Extracting high-frequency network traffic features.
+  2. Tracking rolling statistical baselines and detecting anomalous signals.
+  3. Forecasting attack probability and mapping kill-chain trajectories.
+  4. Running counterfactual future risk simulations to model mitigation outcomes.
+  5. Visualizing live telemetry on a 4-Zone Interactive SVG Network Topology.
+
+
+2. END-TO-END PIPELINE WORKFLOW
+--------------------------------------------------------------------------------
+The complete system operates as a unified 4-module data pipeline:
+
+  [ PACKET STREAM ]
+         │
+         ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ MODULE 1: Real-Time Feature Extraction & Baseline Engine              │
+  │ • Computes packets/sec, SYN rate, port entropy, unique IPs, etc.       │
+  │ • Maintains rolling statistical baselines with anti-poisoning freeze.  │
+  └──────────────────────────────────┬─────────────────────────────────────┘
+                                     │ (Normalized Anomaly Features)
+                                     ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ MODULE 2: Threat Forecasting & Trajectory Engine                       │
+  │ • Computes weighted threat score (0.0 to 1.0) & threat momentum.      │
+  │ • Trajectory Machine: NORMAL -> ANOMALY -> SCANNING -> IMMINENT -> DDoS│
+  │ • Estimates Time-to-Escalation (e.g. 4 minutes remaining).             │
+  └──────────────────────────────────┬─────────────────────────────────────┘
+                                     │ (Threat Score, Stage, Forecasts)
+                                     ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ MODULE 3: Counterfactual Future Simulator & Intervention Engine        │
+  │ • Models 5-minute future trajectories under 3 tactical interventions:  │
+  │   - NO_ACTION      : Status quo under attack (98% CPU saturation).     │
+  │   - BLOCK_SOURCES  : Ingress IP filtering (55% net risk reduction).    │
+  │   - ISOLATE_SERVER : Tactical host isolation & BGP sinkhole (73% red). │
+  └──────────────────────────────────┬─────────────────────────────────────┘
+                                     │ (Master CyberDefenseState Object)
+                                     ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ MODULE 4: SOC Command Center & 4-Zone Topology Canvas (React/Vite UI)  │
+  │ • Render 4 Security Zones (External, DMZ Ingress, App Tier, Data Tier).│
+  │ • SVG Packet Streams (DDoS SYN Flood, Recon, Data Exfiltration).       │
+  │ • Interactive Draggable Nodes, Slide-Out Inspector & Attack Injector. │
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+3. DETAILED EXPLANATION OF EACH MODULE
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+MODULE 1: REAL-TIME TRAFFIC EXTRACTION & ROLLING BASELINE ENGINE
+--------------------------------------------------------------------------------
+- Purpose: Converts raw network packet streams or feature arrays into 
+  normalized anomaly scores relative to historical baseline behavior.
+- Core File: `module1_traffic/baseline.py`, `module1_traffic/extractor.py`
+- Extracted Traffic Features:
+  1. `packets_per_second` (pps): Traffic volume rate.
+  2. `bytes_per_second`: Bandwidth consumption.
+  3. `syn_rate` & `syn_ratio`: Ratio of TCP SYN flags vs total packets.
+  4. `port_entropy`: Shannon entropy across destination ports (detects scans).
+  5. `unique_source_ips`: Number of distinct originating host IPs.
+  6. `connection_failed_rate`: Ratio of unestablished TCP handshakes.
+- Anti-Poisoning Freeze Mechanism:
+  - When traffic anomaly score exceeds `BASELINE_FREEZE_THRESHOLD` (0.50), 
+    the baseline model FREEZES statistical updates. This prevents an attacker 
+    from artificially elevating normal baseline parameters during slow attacks.
+
+--------------------------------------------------------------------------------
+MODULE 2: THREAT FORECASTING & ATTACK TRAJECTORY TRACKER
+--------------------------------------------------------------------------------
+- Purpose: Aggregates Module 1 metrics into an overall Threat Score, calculates 
+  threat velocity/acceleration, and maps the state onto a canonical kill chain.
+- Core Files: `module2_forecast/model.py`, `module2_forecast/trajectory.py`
+- Threat Score Calculation:
+  - Weighted composite formula:
+    Threat Score = (0.30 * SYN_Anomaly) +
+                   (0.20 * Traffic_Anomaly) +
+                   (0.20 * Source_IP_Anomaly) +
+                   (0.20 * Connection_Anomaly) +
+                   (0.10 * Acceleration)
+- Canonical Kill-Chain Trajectory Stages:
+  1. `NORMAL`: Baseline benign traffic operations (Threat Score < 0.25).
+  2. `ANOMALY`: Initial metric deviation detected (Threat Score 0.25 - 0.50).
+  3. `SCANNING`: Active reconnaissance or port sweeps detected (0.50 - 0.70).
+  4. `ATTACK IMMINENT`: High momentum, impending saturation (0.70 - 0.90).
+  5. `DDoS`: System capacity breach / server saturation (> 0.90).
+- Time-to-Escalation ($T_{\text{escalation}}$):
+  - Calculates remaining minutes before reaching 0.95 threshold based on 
+    current momentum ($\Delta \text{score}/\Delta t$).
+
+--------------------------------------------------------------------------------
+MODULE 3: COUNTERFACTUAL FUTURE SIMULATOR & INTERVENTION ENGINE
+--------------------------------------------------------------------------------
+- Purpose: Answers the critical SOC question: "What will happen if we take 
+  Action X versus Action Y?" by simulating 5-minute future risk projections.
+- Core File: `module3-simulator/counterfactual.py`
+- Tactical Intervention Modes:
+  1. `NO_ACTION`:
+     - Status quo projection. Assumes attack continues unchecked.
+     - App Server CPU saturates at 98%, network status escalates to CRITICAL.
+  2. `BLOCK_SOURCES`:
+     - Ingress IP Filtering at DMZ Edge Firewall (`10.0.0.1`).
+     - Applies 60% immediate threat reduction & 90% momentum damping.
+     - App Server CPU drops from 98% -> 39% (Elevated/Amber).
+  3. `ISOLATE_SERVER` (Recommended Action):
+     - Tactical host isolation & packet rerouting into BGP Sinkhole (`10.0.255.255`).
+     - Applies 70% immediate reduction & 100% momentum damping.
+     - App Server enters protected forcefield sandbox state; CPU drops to 18% (Green).
+
+--------------------------------------------------------------------------------
+MODULE 4: SOC COMMAND CENTER & 4-ZONE TOPOLOGY CANVAS
+--------------------------------------------------------------------------------
+- Purpose: Executive & Analyst visual interface built with React 19, TypeScript, 
+  Vite, and Tailwind CSS.
+- Core Directory: `src/`
+- Key UI Components:
+  1. `NetworkTopologyMap.tsx`:
+     - 4 Security Zones:
+       * Zone 1: External / Untrusted (Attacker Botnet C2 `198.51.100.0/24`, Clients)
+       * Zone 2: DMZ / Ingress (Edge Firewall `10.0.0.1`, BGP Sinkhole `10.0.255.255`)
+       * Zone 3: App Tier (API Gateway `10.0.1.50`, Target App Server `10.0.2.100`)
+       * Zone 4: Data Tier (Primary DB `10.0.3.200`, Redis Cache `10.0.3.50`)
+     - Animated SVG Packet Vectors (DDoS SYN Flood, Recon Scan, Exfiltration).
+     - Interactive Draggable Node positioning.
+     - Target App Host Live CPU Saturation Meter.
+  2. `NodeInspectorDrawer.tsx`:
+     - Slide-out right panel showing live hardware metrics (CPU, Throughput, 
+       Active Connections, Drop Rate %, DB Latency, Firewall ACLs).
+  3. `AttackInjectorWidget.tsx`:
+     - Quick scenario injection toolbar (SYN Flood, Port Scan, Exfiltration, Defense).
+  4. `FutureSimulationPanel.tsx` & `ResponseSimulationModal.tsx`:
+     - Comparative risk reduction visualizers and modal step-by-step preview.
+
+
+4. EXECUTION & RUNTIME INSTRUCTIONS
+--------------------------------------------------------------------------------
+To run the full-spectrum prototype locally:
+
+1. Install Frontend Dependencies (Run once in project root `d:\New folder (3)`):
+   $ npm install
+
+2. Launch Frontend SOC Interface:
+   $ npm run dev
+   Access in browser at: http://localhost:5173
+
+3. Launch Backend Pipeline API Server:
+   $ python pipeline.py
+   Access API server at: http://localhost:8000
+   Interactive OpenAPI Docs: http://localhost:8000/docs
+
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
