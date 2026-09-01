@@ -102,9 +102,59 @@ class StateTransitionModel:
         return round(clamped_risk, 2)
 
 
+def blast_radius_utility(
+    action: str,
+    current_risk: float,
+    projected_risk: float,
+    mission_impact: float = 0.0,
+    latency_overhead: float = 0.0,
+    alpha: float = 0.6,
+    beta: float = 0.25,
+    gamma: float = 0.15,
+) -> float:
+    """
+    Dual-objective blast-radius utility index (§2.3 Improvements MD):
+
+        Utility(Action_k) = α·ΔRisk(Action_k) − β·Cost_Mission(Action_k) − γ·Latency_Overhead(Action_k)
+
+    Higher is better. Prevents recommending aggressive actions that crash vital services.
+
+    mission_impact: normalised [0,1] estimate of collateral service disruption (0 = no disruption).
+    latency_overhead: normalised [0,1] extra latency burden imposed by the action.
+    """
+    delta_risk = max(0.0, current_risk - projected_risk)
+    utility = alpha * delta_risk - beta * mission_impact - gamma * latency_overhead
+    return round(utility, 4)
+
+
+# Per-action mission and latency cost estimates (can be overridden per deployment)
+_ACTION_MISSION_COST: Dict[str, float] = {
+    "NO_ACTION":          0.00,
+    "RATE_LIMIT":         0.10,
+    "APPLY_WAF_RULES":    0.15,
+    "BLOCK_SOURCES":      0.25,
+    "TERMINATE_SESSION":  0.20,
+    "PATCH_VULNERABILITY": 0.10,
+    "ISOLATE_SERVER":     0.50,
+    "ISOLATE_ASSET":      0.50,
+}
+
+_ACTION_LATENCY_COST: Dict[str, float] = {
+    "NO_ACTION":          0.00,
+    "RATE_LIMIT":         0.05,
+    "APPLY_WAF_RULES":    0.10,
+    "BLOCK_SOURCES":      0.15,
+    "TERMINATE_SESSION":  0.10,
+    "PATCH_VULNERABILITY": 0.05,
+    "ISOLATE_SERVER":     0.20,
+    "ISOLATE_ASSET":      0.20,
+}
+
+
 class CounterfactualSimulator:
     """
     Simulator engine that runs counterfactual scenarios across candidate defensive actions.
+    Scores each action by blast-radius utility (§2.3) rather than raw risk alone.
     """
 
     DEFAULT_ACTIONS = ["NO_ACTION", "BLOCK_SOURCES", "ISOLATE_SERVER"]
@@ -144,6 +194,9 @@ class CounterfactualSimulator:
         best_action = None
         best_risk = float("inf")
 
+        best_action = None
+        best_utility = float("-inf")
+
         for act in actions:
             projected_risk = self.model.compute_future_risk(
                 current_risk=current_risk,
@@ -153,17 +206,31 @@ class CounterfactualSimulator:
                 horizon_minutes=horizon_minutes
             )
 
+            act_key = str(act).upper().strip()
+            mission_cost = _ACTION_MISSION_COST.get(act_key, 0.3)
+            latency_cost = _ACTION_LATENCY_COST.get(act_key, 0.1)
+            utility = blast_radius_utility(
+                action=act,
+                current_risk=current_risk,
+                projected_risk=projected_risk,
+                mission_impact=mission_cost,
+                latency_overhead=latency_cost,
+            )
+
             scenarios.append({
                 "action": act,
-                horizon_key: projected_risk
+                horizon_key: projected_risk,
+                "blast_radius_utility": utility,
+                "mission_impact": mission_cost,
             })
 
             if act == "NO_ACTION":
                 no_action_risk = projected_risk
 
-            if projected_risk < best_risk:
-                best_risk = projected_risk
+            if utility > best_utility:
+                best_utility = utility
                 best_action = act
+                best_risk = projected_risk
 
         if no_action_risk is None:
             no_action_risk = scenarios[0][horizon_key]
@@ -174,5 +241,6 @@ class CounterfactualSimulator:
             "current_risk": round(current_risk, 2),
             "scenarios": scenarios,
             "recommended_action": best_action or "NO_ACTION",
-            "risk_reduction": max(0.0, risk_reduction)
+            "risk_reduction": max(0.0, risk_reduction),
+            "best_utility": round(best_utility, 4),
         }

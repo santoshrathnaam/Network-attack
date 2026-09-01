@@ -22,11 +22,23 @@ class TrajectoryForecast:
 
 class TrajectoryTracker:
     """
-    Trajectory state machine enforcing SIH26153 Design Document §3.2 & §6.
-    
-    Canonical stages:
-        NORMAL -> ANOMALY -> SCANNING -> ATTACK IMMINENT -> DDoS
+    Trajectory state machine enforcing SIH26153 Design Document §3.2 & §6
+    and curr.txt §2.2 Multi-Vector Kill-Chains.
+
+    Supported Vectors:
+        DDoS:       NORMAL -> ANOMALY -> SCANNING -> ATTACK IMMINENT -> DDoS
+        APT:        RECON -> INGRESS_BREACH -> PRIVILEGE_ESCALATION -> C2_BEACONING -> DATA_EXFILTRATION
+        RANSOMWARE: SMB_SWEEP -> KERBEROASTING -> SHADOW_COPY_PURGE -> LATERAL_ENCRYPTION
+        SLOWLORIS:  BENIGN_HTTP -> PORT_SWEEP -> HALF_OPEN_HOLD -> SOCKET_EXHAUSTION
     """
+
+    VECTOR_STAGES = {
+        "DDoS":        ["NORMAL", "ANOMALY", "SCANNING", "ATTACK IMMINENT", "DDoS"],
+        "APT":         ["RECON", "INGRESS_BREACH", "PRIVILEGE_ESCALATION", "C2_BEACONING", "DATA_EXFILTRATION"],
+        "RANSOMWARE":  ["SMB_SWEEP", "KERBEROASTING", "SHADOW_COPY_PURGE", "LATERAL_ENCRYPTION"],
+        "SLOWLORIS":   ["BENIGN_HTTP", "PORT_SWEEP", "HALF_OPEN_HOLD", "SOCKET_EXHAUSTION"],
+        "BGP_HIJACK":  ["PREFIX_ANOMALY", "TRAFFIC_DIVERSION", "ROUTE_LEAK", "BLACKHOLING"],
+    }
 
     STAGES = config.TRAJECTORY_STAGES
 
@@ -39,13 +51,15 @@ class TrajectoryTracker:
         threat_momentum: float,
         features: Dict[str, float],
         anomalies: Dict[str, float],
-        window_seconds: int = config.WINDOW_SECONDS
+        window_seconds: int = config.WINDOW_SECONDS,
+        threat_vector: str = "DDoS"
     ) -> TrajectoryForecast:
         """
-        Derive kill-chain trajectory, time-to-escalation, and feature evidence.
+        Derive kill-chain trajectory, time-to-escalation, and feature evidence for a target threat vector.
         """
-        current_stage, stage_progress = self._determine_current_stage(threat_score)
-        next_stage = self._determine_next_stage(current_stage, threat_momentum)
+        stages = self.VECTOR_STAGES.get(threat_vector, self.VECTOR_STAGES["DDoS"])
+        current_stage, stage_progress = self._determine_current_stage_vector(threat_score, stages)
+        next_stage = self._determine_next_stage_vector(current_stage, threat_momentum, stages)
         time_to_escalation = self._estimate_time_to_escalation(
             threat_score=threat_score,
             threat_momentum=threat_momentum,
@@ -63,50 +77,34 @@ class TrajectoryTracker:
             evidence=evidence
         )
 
-    def _determine_current_stage(self, threat_score: float) -> (str, float):
-        """
-        Map threat score [0.0 - 1.0] to canonical stage and intra-stage progress [0.0 - 1.0].
-        
-        Thresholds:
-            0.00 - 0.25 -> NORMAL
-            0.25 - 0.45 -> ANOMALY
-            0.45 - 0.70 -> SCANNING
-            0.70 - 0.85 -> ATTACK IMMINENT
-            0.85 - 1.00 -> DDoS
-        """
-        if threat_score < 0.25:
-            stage = "NORMAL"
-            progress = threat_score / 0.25
-        elif threat_score < 0.45:
-            stage = "ANOMALY"
-            progress = (threat_score - 0.25) / 0.20
-        elif threat_score < 0.70:
-            stage = "SCANNING"
-            progress = (threat_score - 0.45) / 0.25
-        elif threat_score < 0.85:
-            stage = "ATTACK IMMINENT"
-            progress = (threat_score - 0.70) / 0.15
-        else:
-            stage = "DDoS"
-            progress = min(1.0, (threat_score - 0.85) / 0.15)
+    def _determine_current_stage_vector(self, threat_score: float, stages: List[str]) -> (str, float):
+        """Map threat score to stage sequence dynamically."""
+        num_stages = len(stages)
+        step = 1.0 / num_stages
+        idx = int(threat_score / step)
+        idx = min(num_stages - 1, max(0, idx))
+        progress = (threat_score - (idx * step)) / step
+        return stages[idx], max(0.0, min(1.0, progress))
 
-        return stage, max(0.0, min(1.0, progress))
-
-    def _determine_next_stage(self, current_stage: str, momentum: float) -> str:
-        """
-        Determine predicted next stage based on current stage and threat momentum.
-        """
+    def _determine_next_stage_vector(self, current_stage: str, momentum: float, stages: List[str]) -> str:
+        """Determine next stage in vector stage sequence."""
         try:
-            curr_idx = self.STAGES.index(current_stage)
+            curr_idx = stages.index(current_stage)
         except ValueError:
             curr_idx = 0
 
-        if momentum > 0.02 and curr_idx < len(self.STAGES) - 1:
-            return self.STAGES[curr_idx + 1]
+        if momentum > 0.02 and curr_idx < len(stages) - 1:
+            return stages[curr_idx + 1]
         elif momentum < -0.05 and curr_idx > 0:
-            return self.STAGES[curr_idx - 1]
-        
+            return stages[curr_idx - 1]
+
         return current_stage
+
+    def _determine_current_stage(self, threat_score: float) -> (str, float):
+        return self._determine_current_stage_vector(threat_score, self.VECTOR_STAGES["DDoS"])
+
+    def _determine_next_stage(self, current_stage: str, momentum: float) -> str:
+        return self._determine_next_stage_vector(current_stage, momentum, self.VECTOR_STAGES["DDoS"])
 
     def _estimate_time_to_escalation(
         self,
@@ -199,3 +197,4 @@ class TrajectoryTracker:
             })
 
         return evidence_items
+
