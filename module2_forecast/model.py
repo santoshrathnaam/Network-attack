@@ -19,29 +19,71 @@ class ThreatAssessment:
     attack_probability: float
     predicted_attack: str
     forecast_probabilities: Dict[str, float]
+    adaptive_weights: Dict[str, float] = field(default_factory=dict)
+
+
+class AdaptiveWeightCalibrator:
+    """
+    EMA-based contextual adaptive weight calibration (§2.2 Improvements MD).
+    Continuously updates feature importance based on observed anomaly magnitudes,
+    replacing fixed constants with dynamically calibrated weights.
+    """
+
+    _CHANNELS = ("syn", "traffic", "source", "connection")
+    _EMA_ALPHA = 0.15  # Smoothing factor for weight update velocity
+
+    def __init__(self):
+        self._ema: Dict[str, float] = {
+            "syn": config.WEIGHT_SYN,
+            "traffic": config.WEIGHT_TRAFFIC,
+            "source": config.WEIGHT_SOURCE,
+            "connection": config.WEIGHT_CONNECTION,
+        }
+
+    def update(self, anomalies: Dict[str, float]) -> Dict[str, float]:
+        """Update EMA weights from current anomaly observations, return normalised weights."""
+        # Accumulate EMA of each channel's raw anomaly signal
+        for ch in self._CHANNELS:
+            val = float(anomalies.get(ch, 0.0))
+            self._ema[ch] = self._EMA_ALPHA * val + (1.0 - self._EMA_ALPHA) * self._ema[ch]
+
+        total = sum(self._ema[ch] for ch in self._CHANNELS) or 1.0
+        return {ch: round(self._ema[ch] / total, 4) for ch in self._CHANNELS}
+
+    def reset(self):
+        self._ema = {
+            "syn": config.WEIGHT_SYN,
+            "traffic": config.WEIGHT_TRAFFIC,
+            "source": config.WEIGHT_SOURCE,
+            "connection": config.WEIGHT_CONNECTION,
+        }
 
 
 class ThreatModel:
     """
     Threat scoring engine enforcing SIH26153 Design Document §6 algorithms.
-    
-    Formula:
+
+    Formula (adaptive):
         Threat Score =
-            weighted traffic anomaly (0.20)
-          + weighted SYN anomaly (0.30)
-          + weighted source anomaly (0.20)
-          + weighted connection anomaly (0.20)
-          + temporal acceleration (0.10)
+            w_syn(t) * SYN_anomaly
+          + w_traffic(t) * Traffic_anomaly
+          + w_source(t) * Source_anomaly
+          + w_connection(t) * Connection_anomaly
+          + WEIGHT_ACCELERATION * temporal_acceleration
+
+    Weights w_*(t) are updated each window by AdaptiveWeightCalibrator (§2.2).
     """
 
     def __init__(self):
         self._history: List[float] = []
         self._anomaly_history: List[float] = []
+        self._weight_calibrator = AdaptiveWeightCalibrator()
 
     def reset(self):
         """Reset internal history state."""
         self._history.clear()
         self._anomaly_history.clear()
+        self._weight_calibrator.reset()
 
     def evaluate(
         self,
@@ -77,12 +119,19 @@ class ThreatModel:
         if len(self._anomaly_history) > 20:
             self._anomaly_history.pop(0)
 
-        # Calculate weighted threat score matching design doc §6 & config.py
+        # Adaptive weight calibration (§2.2): update weights from live anomaly signal
+        adaptive_weights = self._weight_calibrator.update(anomalies)
+        w_syn = adaptive_weights["syn"]
+        w_traffic = adaptive_weights["traffic"]
+        w_source = adaptive_weights["source"]
+        w_conn = adaptive_weights["connection"]
+
+        # Calculate weighted threat score (design doc §6 with adaptive weights)
         weighted_sum = (
-            syn_anom * config.WEIGHT_SYN +
-            traffic_anom * config.WEIGHT_TRAFFIC +
-            source_anom * config.WEIGHT_SOURCE +
-            conn_anom * config.WEIGHT_CONNECTION +
+            syn_anom * w_syn +
+            traffic_anom * w_traffic +
+            source_anom * w_source +
+            conn_anom * w_conn +
             acceleration * config.WEIGHT_ACCELERATION
         )
 
@@ -120,7 +169,13 @@ class ThreatModel:
             temporal_acceleration=round(acceleration, 4),
             attack_probability=attack_probability,
             predicted_attack=predicted_attack,
-            forecast_probabilities=forecast_probs
+            forecast_probabilities=forecast_probs,
+            adaptive_weights={
+                "syn": w_syn,
+                "traffic": w_traffic,
+                "source": w_source,
+                "connection": w_conn,
+            },
         )
 
     def _classify_attack_probabilities(

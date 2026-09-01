@@ -31,6 +31,9 @@ from module3 import (
     DefensiveAction
 )
 
+# Audit Ledger (§2.5)
+from shared.audit_ledger import log_event, get_ledger
+
 # Persistent predictor instance for stateful rolling window processing
 _global_predictor = ThreatPredictor()
 
@@ -40,7 +43,8 @@ def run_end_to_end_pipeline(
     features_override: Optional[Dict[str, Any]] = None,
     affected_asset: str = "API_GATEWAY",
     window_seconds: int = 10,
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = None,
+    threat_vector: str = "DDoS",
 ) -> Dict[str, Any]:
     """
     Executes the entire 4-module pipeline in sequence:
@@ -94,11 +98,20 @@ def run_end_to_end_pipeline(
         ]
         m1_output = process_traffic(records=sample_records, window_seconds=window_seconds)
 
+    # Log Module 1 result to audit ledger
+    log_event("M1_WINDOW", {
+        "pps": m1_output["features"].get("packets_per_second"),
+        "syn_rate": m1_output["features"].get("syn_rate"),
+        "changepoint_probability": m1_output.get("changepoint_probability"),
+        "baseline_ready": m1_output.get("baseline_ready"),
+    })
+
     # Step 2: Module 2 Execution
     m2_output = _global_predictor.predict(
         input_data=m1_output,
         affected_asset=affected_asset,
-        timestamp=ts
+        timestamp=ts,
+        threat_vector=threat_vector,
     )
 
     # Step 3: Module 3 Execution
@@ -116,6 +129,15 @@ def run_end_to_end_pipeline(
         current_stage=stage_name,
         affected_asset=affected_asset
     )
+
+    # Log Module 2 forecast to audit ledger
+    log_event("M2_FORECAST", {
+        "threat_score": m2_output.get("threat_score"),
+        "threat_vector": threat_vector,
+        "current_stage": m2_output.get("current_stage"),
+        "attack_probability": m2_output.get("attack_probability"),
+        "adaptive_weights": m2_output.get("adaptive_weights", {}),
+    })
 
     m3_primary, m3_detailed = execute_module3_pipeline(threat_input)
 
@@ -158,9 +180,18 @@ def run_end_to_end_pipeline(
             {"name": "Traffic momentum", "change": round(momentum, 2), "unit": "Mb/s²", "severity": "HIGH"}
         ]
 
+    # Log M3 recommended action to audit ledger
+    log_event("M3_ACTION", {
+        "recommended_action": m3_primary.recommendation.action,
+        "no_action_risk": no_action_risk,
+        "best_action_risk": isolate_server_risk,
+        "risk_reduction": round(max(0.0, no_action_risk - isolate_server_risk), 2),
+    })
+
     cyber_defense_state = {
         "timestamp": ts,
         "network_status": network_status,
+        "threat_vector": threat_vector,
         "threat": {
             "score": round(threat_score, 2),
             "momentum": round(momentum, 2),
@@ -262,6 +293,81 @@ async def simulate_endpoint(request: Request):
         "recommended_action": "ISOLATE_SERVER" if score > 0.6 else "BLOCK_SOURCES",
         "risk_reduction": reduction
     }
+
+
+@pipeline_app.post("/api/v1/pipeline/run")
+@pipeline_app.post("/pipeline/run/vector")
+async def run_pipeline_vector_endpoint(request: Request):
+    """Accepts threat_vector parameter to select multi-vector kill-chain (DDoS/APT/RANSOMWARE/SLOWLORIS/BGP_HIJACK)."""
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    packets = body.get("packets")
+    features = body.get("features")
+    asset = body.get("affected_asset", "API_GATEWAY")
+    vector = body.get("threat_vector", "DDoS")
+    res = run_end_to_end_pipeline(packets=packets, features_override=features, affected_asset=asset, threat_vector=vector)
+    return res
+
+
+@pipeline_app.get("/api/v1/audit/trail")
+@pipeline_app.get("/audit/trail")
+async def get_audit_trail(n: int = 50):
+    """
+    Returns the n most recent immutable cryptographic audit ledger entries (§2.5).
+    Each entry carries a SHA-256 hash chain for tamper-evidence.
+    """
+    ledger = get_ledger()
+    return {
+        "integrity_valid": ledger.verify_integrity(),
+        "total_entries": len(ledger),
+        "entries": ledger.recent(n),
+    }
+
+
+@pipeline_app.get("/api/v1/incident/dossier")
+@pipeline_app.get("/incident/dossier")
+async def get_incident_dossier():
+    """
+    Automated Sovereign Incident Dossier Generator (§2.4 Improvements MD).
+    Produces a CERT-In 6-hour mandatory incident reporting formatted payload.
+    Includes pipeline state, audit trail, and cryptographic hash for non-repudiation.
+    """
+    import hashlib, json as _json
+    state = run_end_to_end_pipeline()
+    ledger = get_ledger()
+    ts_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    threat = state.get("threat", {})
+    dossier = {
+        "report_format": "CERT-In 6-Hour Mandatory Incident Report",
+        "sih_reference": "SIH26153",
+        "generated_at": ts_now,
+        "incident_classification": state.get("network_status", "UNKNOWN"),
+        "threat_vector": state.get("threat_vector", "DDoS"),
+        "severity": "CRITICAL" if threat.get("score", 0) > 0.75 else "HIGH" if threat.get("score", 0) > 0.50 else "MEDIUM",
+        "affected_assets": [state.get("module_outputs", {}).get("module2", {}).get("affected_asset", "API_GATEWAY")],
+        "threat_indicators": {
+            "threat_score": threat.get("score"),
+            "momentum": threat.get("momentum"),
+            "time_to_escalation_minutes": threat.get("time_to_escalation"),
+            "kill_chain_stage": state.get("trajectory", {}).get("current_stage"),
+            "next_stage": state.get("trajectory", {}).get("next_stage"),
+            "attack_probabilities": state.get("forecast", {}),
+        },
+        "recommended_action": state.get("simulation", {}).get("recommended_action"),
+        "risk_reduction_percent": round(state.get("simulation", {}).get("risk_reduction", 0) * 100, 1),
+        "evidence_signals": state.get("evidence", []),
+        "audit_trail": {
+            "ledger_integrity_valid": ledger.verify_integrity(),
+            "total_logged_events": len(ledger),
+            "recent_events": ledger.recent(10),
+        },
+        "dossier_hash": hashlib.sha256(
+            _json.dumps({"ts": ts_now, "threat": threat}, sort_keys=True).encode()
+        ).hexdigest(),
+    }
+
+    log_event("DOSSIER_GENERATED", {"severity": dossier["severity"], "ts": ts_now})
+    return dossier
 
 
 if __name__ == "__main__":

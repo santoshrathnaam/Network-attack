@@ -31,7 +31,8 @@ class ThreatPredictor:
         self,
         input_data: Dict[str, Any],
         affected_asset: str = "API_GATEWAY",
-        timestamp: Optional[str] = None
+        timestamp: Optional[str] = None,
+        threat_vector: str = "DDoS"
     ) -> Dict[str, Any]:
         """
         Main prediction entry point.
@@ -75,7 +76,8 @@ class ThreatPredictor:
             threat_score=assessment.threat_score,
             threat_momentum=assessment.threat_momentum,
             features=features,
-            anomalies=anomalies
+            anomalies=anomalies,
+            threat_vector=threat_vector
         )
 
         # 3. Assemble Output Contract (Matching §6, §10, and Module 3 ThreatStateInput)
@@ -87,6 +89,8 @@ class ThreatPredictor:
             "attack_probability": assessment.attack_probability,
             "predicted_attack": assessment.predicted_attack,
             "attack_type": assessment.predicted_attack,  # Alias for Module 3 ThreatStateInput
+            "threat_vector": threat_vector,
+            "adaptive_weights": assessment.adaptive_weights,
             "current_stage": trajectory.current_stage,
             "next_stage": trajectory.next_stage,
             "stage_progress": trajectory.stage_progress,
@@ -115,7 +119,8 @@ def reset_default_predictor():
 def predict(
     features_or_m1_output: Dict[str, Any],
     affected_asset: str = "API_GATEWAY",
-    predictor: Optional[ThreatPredictor] = None
+    predictor: Optional[ThreatPredictor] = None,
+    threat_vector: str = "DDoS"
 ) -> Dict[str, Any]:
     """
     Required single-function entry point mandated by design doc §6:
@@ -126,6 +131,8 @@ def predict(
                            or direct feature dictionary.
     affected_asset: target system asset identifier.
     predictor: optional ThreatPredictor instance (defaults to module singleton).
+    threat_vector: target attack family ("DDoS", "APT", "RANSOMWARE", "SLOWLORIS").
     """
     engine = predictor if predictor is not None else _default_predictor
-    return engine.predict(input_data=features_or_m1_output, affected_asset=affected_asset)
+    return engine.predict(input_data=features_or_m1_output, affected_asset=affected_asset, threat_vector=threat_vector)
+

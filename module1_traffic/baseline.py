@@ -34,6 +34,7 @@ exposed on Module 1's output contract.
 """
 
 import math
+import numpy as np
 
 from shared import config
 
@@ -56,6 +57,57 @@ def _clamp01(x):
     return max(0.0, min(1.0, x))
 
 
+class BayesianChangepointDetector:
+    """
+    Online Bayesian Changepoint Detection for adaptive network baseline drift.
+    Distinguishes legitimate traffic spikes from malicious kill-chain trajectory shifts.
+    (See curr.txt §4.2)
+    """
+
+    def __init__(self, hazard_rate: float = 1 / 100.0, mean_prior: float = 100.0, var_prior: float = 20.0):
+        self.hazard = hazard_rate
+        self.mean_prior = mean_prior
+        self.var_prior = var_prior
+        self.R = np.array([1.0])  # Run length distribution
+        self.means = np.array([mean_prior])
+        self.vars = np.array([var_prior])
+
+    def update(self, x_t: float) -> float:
+        """
+        Ingests new window observation x_t, returns probability of changepoint P(r_t = 0).
+        """
+        # Limit memory footprint of run-length distribution to 100 states
+        if len(self.R) > 100:
+            self.R = self.R[:100]
+            self.means = self.means[:100]
+            self.vars = self.vars[:100]
+            self.R /= np.sum(self.R)
+
+        # 1. Predictive probability under Gaussian prior
+        epsilon = 1e-6
+        safe_vars = np.maximum(self.vars, epsilon)
+        pred_probs = 1.0 / np.sqrt(2 * np.pi * safe_vars) * np.exp(-0.5 * ((x_t - self.means) ** 2) / safe_vars)
+        pred_probs = np.maximum(pred_probs, 1e-12)
+
+        # 2. Growth and changepoint probabilities
+        growth_probs = self.R * pred_probs * (1.0 - self.hazard)
+        cp_prob = np.sum(self.R * pred_probs * self.hazard)
+
+        # 3. Update run length distribution
+        self.R = np.append([cp_prob], growth_probs)
+        total_mass = np.sum(self.R)
+        if total_mass > 0:
+            self.R /= total_mass
+        else:
+            self.R = np.array([1.0])
+
+        # 4. Update sufficient statistics
+        self.means = np.append([self.mean_prior], (self.means * self.vars + x_t) / (self.vars + 1))
+        self.vars = np.append([self.var_prior], self.vars / (self.vars + 1))
+
+        return float(self.R[0])
+
+
 class _ChannelStat:
     """Exponentially-weighted mean/variance for one raw signal."""
 
@@ -70,13 +122,6 @@ class _ChannelStat:
         if not self.initialized:
             return 0.0
         std = math.sqrt(self.var)
-        # Floor std at 1% of the mean (or a tiny absolute epsilon near
-        # zero). Without this, a channel that has happened to be
-        # perfectly flat so far has var == 0 exactly, and *any* value
-        # -- however extreme -- would divide out to z == 0 and never
-        # register as anomalous. A flat history is a plausible real
-        # case (a quiet network segment, or the first few windows
-        # before natural jitter accumulates), not just a test artifact.
         std = max(std, abs(self.mean) * 0.01, 1e-6)
         return (value - self.mean) / std
 
@@ -106,6 +151,7 @@ class AdaptiveBaseline:
         self._windows_seen = 0
         self._frozen = False
         self._quiet_streak = 0
+        self.bocpd = BayesianChangepointDetector()
 
     @property
     def windows_seen(self):
@@ -120,7 +166,7 @@ class AdaptiveBaseline:
         """Score one window's raw feature values against the current
         baseline, then (unless frozen) fold them into it.
 
-        Returns (anomalies: dict[str, float] in [0,1], baseline_ready: bool).
+        Returns (anomalies: dict[str, float] in [0,1], baseline_ready: bool, changepoint_prob: float).
         """
         stats = self._stats
 
@@ -141,13 +187,8 @@ class AdaptiveBaseline:
             _INDICATOR_WEIGHTS[k] * anomalies[k] for k in _INDICATOR_WEIGHTS
         )
 
-        # Freeze only applies to a baseline that has actually converged.
-        # EWMA variance bootstraps from 0 (see _ChannelStat), so during
-        # the first BASELINE_WARMUP_WINDOWS windows the std-dev is still
-        # tiny relative to real traffic jitter -- ordinary noise would
-        # read as several standard deviations out and latch a spurious
-        # freeze before the baseline ever had a chance to learn. Always
-        # adapt through warm-up regardless of indicator value.
+        cp_prob = self.bocpd.update(packets_per_second)
+
         still_warming_up = self._windows_seen < config.BASELINE_WARMUP_WINDOWS
 
         if still_warming_up:
@@ -172,4 +213,5 @@ class AdaptiveBaseline:
         self._windows_seen += 1
         baseline_ready = self._windows_seen > config.BASELINE_WARMUP_WINDOWS
 
-        return anomalies, baseline_ready
+        return anomalies, baseline_ready, cp_prob
+
