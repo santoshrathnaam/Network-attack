@@ -8,6 +8,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        display: ['"Bricolage Grotesque"', 'Georgia', 'serif'],
+        body: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
         sans: [
           "-apple-system",
           "BlinkMacSystemFont",
@@ -32,6 +34,12 @@ export default {
         ]
       },
       colors: {
+        paper: '#F4F4F1',
+        paperDeep: '#EBEBE6',
+        ink: '#111111',
+        inkSoft: '#5A5A55',
+        signal: '#E5322D',
+        safe: '#128A5A',
         apple: {
           canvas: {
             light: "#F5F5F7",

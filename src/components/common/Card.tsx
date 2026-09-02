@@ -21,25 +21,25 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-white dark:bg-[#12141A] border border-[#E5E5EA] dark:border-[#222733] rounded-[16px] p-5 shadow-apple dark:shadow-apple-dark transition-all duration-200 ${className}`}
+      className={`bg-paper border-2 border-ink/15 rounded-3xl p-6 transition-colors duration-200 ${className}`}
     >
       {(title || subtitle || badge || action) && (
         <div
-          className={`flex items-center justify-between pb-3.5 mb-3.5 ${
-            headerBorder ? 'border-b border-[#F0F0F3] dark:border-[#1E232E]' : ''
+          className={`flex items-start justify-between gap-4 pb-4 mb-4 ${
+            headerBorder ? 'border-b-2 border-ink/10' : ''
           }`}
         >
-          <div className="space-y-0.5">
+          <div className="space-y-1.5 min-w-0">
             <div className="flex items-center gap-2.5">
               {title && (
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                <h3 className="font-display font-extrabold text-xl leading-tight tracking-[-0.01em] text-ink">
                   {title}
                 </h3>
               )}
               {badge}
             </div>
             {subtitle && (
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">
+              <p className="text-sm text-inkSoft leading-snug max-w-xl">
                 {subtitle}
               </p>
             )}

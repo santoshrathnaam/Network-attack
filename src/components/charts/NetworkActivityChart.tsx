@@ -2,6 +2,7 @@
 import { TrafficDataPoint, NetworkStatus } from '../../types/cyberDefense';
 import { Card } from '../common/Card';
 import { Activity, ShieldAlert, Zap, Clock } from 'lucide-react';
+import { BASELINES } from '../../services/engine';
 
 interface NetworkActivityChartProps {
   trafficData?: TrafficDataPoint[];
@@ -32,7 +33,7 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
   const innerHeight = height - padding.top - padding.bottom;
 
   // Calculate scales
-  const { minVal, maxVal, pathD, areaD, thresholdY, baselineY, pointsWithCoords } = useMemo(() => {
+  const { minVal, maxVal, pathD, areaD, thresholdY, baselineY, bandTopY, bandBotY, pointsWithCoords } = useMemo(() => {
     if (displayPoints.length === 0) {
       return {
         minVal: 0,
@@ -41,6 +42,8 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
         areaD: '',
         thresholdY: 0,
         baselineY: 0,
+        bandTopY: 0,
+        bandBotY: 0,
         pointsWithCoords: []
       };
     }
@@ -90,7 +93,11 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
     }
 
     const tY = getY(displayPoints[0]?.anomaly_threshold || 480);
-    const bY = getY(displayPoints[0]?.baseline || 240);
+    const baseMean = displayPoints[0]?.baseline || BASELINES.pps.mean;
+    const bY = getY(baseMean);
+    // Shaded normal band: baseline mean ± 2σ (from the learned pps baseline).
+    const bandTopY = getY(baseMean + 2 * BASELINES.pps.std);
+    const bandBotY = getY(baseMean - 2 * BASELINES.pps.std);
 
     return {
       minVal: Math.round(minV),
@@ -99,6 +106,8 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
       areaD: area,
       thresholdY: tY,
       baselineY: bY,
+      bandTopY,
+      bandBotY,
       pointsWithCoords: coords
     };
   }, [displayPoints, innerWidth, innerHeight]);
@@ -137,7 +146,7 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
             Current Rate
           </span>
           <div className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 font-mono">
-            {latestPoint ? `${latestPoint.traffic_volume} Mbps` : '—'}
+            {latestPoint ? `${latestPoint.traffic_volume} pkt/s` : '—'}
           </div>
         </div>
         <div>
@@ -145,23 +154,23 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
             Anomaly Threshold
           </span>
           <div className="text-lg font-semibold tabular-nums text-orange-600 dark:text-orange-400 font-mono">
-            480 Mbps
+            {displayPoints[0]?.anomaly_threshold ?? 444} pkt/s
           </div>
         </div>
         <div>
           <span className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500">
             Nominal Baseline
           </span>
-          <div className="text-lg font-semibold tabular-nums text-neutral-500 dark:text-neutral-400 font-mono">
-            240 Mbps
+          <div className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 font-mono">
+            {Math.round(BASELINES.pps.mean)} pkt/s
           </div>
         </div>
         <div>
           <span className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500">
-            Escalation Zone
+            Current Status
           </span>
-          <div className="text-lg font-semibold tabular-nums text-rose-600 dark:text-rose-400 font-mono">
-            &gt; 520 Mbps
+          <div className="text-lg font-semibold tabular-nums text-neutral-700 dark:text-neutral-300 font-mono">
+            {currentStatus}
           </div>
         </div>
       </div>
@@ -232,24 +241,42 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
             );
           })}
 
+          {/* Shaded baseline band: μ ± 2σ — traffic inside this is "normal" */}
+          <rect
+            x={padding.left}
+            y={Math.min(bandTopY, bandBotY)}
+            width={width - padding.left - padding.right}
+            height={Math.abs(bandBotY - bandTopY)}
+            className="fill-emerald-500/10"
+          />
+          <line
+            x1={padding.left}
+            y1={bandTopY}
+            x2={width - padding.right}
+            y2={bandTopY}
+            className="stroke-emerald-500/40"
+            strokeDasharray="2 3"
+            strokeWidth="1"
+          />
+
           {/* Baseline Reference Line */}
           <line
             x1={padding.left}
             y1={baselineY}
             x2={width - padding.right}
             y2={baselineY}
-            stroke="#9CA3AF"
+            stroke="#10B981"
             strokeDasharray="4 4"
             strokeWidth="1.2"
-            opacity="0.6"
+            opacity="0.55"
           />
           <text
             x={width - padding.right}
             y={baselineY - 4}
             textAnchor="end"
-            className="text-[10px] fill-neutral-400 dark:fill-neutral-500 font-medium"
+            className="text-[10px] fill-emerald-600 dark:fill-emerald-400 font-medium"
           >
-            Baseline
+            Baseline μ ± 2σ
           </text>
 
           {/* Anomaly Threshold Boundary Line */}
@@ -269,7 +296,7 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
             textAnchor="end"
             className="text-[10px] fill-orange-500 font-semibold uppercase tracking-wider"
           >
-            Anomaly Boundary (480 Mbps)
+            {`Anomaly boundary (${displayPoints[0]?.anomaly_threshold ?? 444} pkt/s)`}
           </text>
 
           {/* Traffic Area */}
@@ -366,10 +393,10 @@ export const NetworkActivityChart: React.FC<NetworkActivityChartProps> = ({
             </div>
             <div className="font-semibold flex items-center gap-1.5">
               <span>Traffic:</span>
-              <span className="font-mono text-emerald-400">{hoveredPoint.traffic_volume} Mbps</span>
+              <span className="font-mono text-emerald-400">{hoveredPoint.traffic_volume} pkt/s</span>
             </div>
             <div className="text-[11px] text-neutral-300">
-              Anomaly Threshold: {hoveredPoint.anomaly_threshold} Mbps
+              Anomaly threshold: {hoveredPoint.anomaly_threshold} pkt/s
             </div>
           </div>
         )}

@@ -57,6 +57,64 @@ export interface TrafficDataPoint {
   status: NetworkStatus;
 }
 
+/** One raw telemetry channel measured against its learned baseline. */
+export interface ChannelReading {
+  key: 'syn' | 'traffic' | 'source' | 'connection';
+  label: string;
+  unit: string;
+  current: number;        // raw observed value this window
+  baselineMean: number;   // learned normal
+  baselineStd: number;    // learned jitter (1σ)
+  z: number;              // standard deviations from baseline
+  anomaly: number;        // 0..1, clamp(z / 6)
+  series: number[];       // recent raw values, oldest → newest
+}
+
+/** One weighted term in the threat-score sum. */
+export interface ScoreTerm {
+  key: string;
+  label: string;
+  weight: number;
+  anomaly: number;
+  contribution: number;   // weight × anomaly
+}
+
+/** One time window: the raw measurements and the score they produce. */
+export interface DerivationPoint {
+  index: number;
+  raw: { synRatio: number; pps: number; uniqueSources: number; failedConns: number };
+  anomalies: { syn: number; traffic: number; source: number; connection: number };
+  contributions: { syn: number; traffic: number; source: number; conn: number; accel: number };
+  score: number;
+}
+
+/** The full audit trail behind a state — how every headline number was computed. */
+export interface DerivationData {
+  channels: ChannelReading[];
+  terms: ScoreTerm[];
+  acceleration: number;
+  score: number;
+  windowSeconds: number;
+  /** Per-window history, oldest → newest: the score as a measured trajectory. */
+  trace: DerivationPoint[];
+  /** Counterfactual outcome at the horizon the recommendation is decided on. */
+  decision: {
+    horizon: string;
+    noActionRisk: number;
+    bestAction: string;
+    bestRisk: number;
+    reductionPct: number;
+    confidence: number;
+    /** Every option at the decision horizon, with the arithmetic behind it. */
+    options: { action: string; risk: number; start: number; growth: number; defense: number }[];
+  };
+  /** Attack family the classifier leads with, and its probability. */
+  predicted: { key: string; p: number };
+  /** Minutes until the escalation threshold, or 0 when not projected. */
+  timeToEscalation: number;
+  stage: string;
+}
+
 /** Master schema matching Modules 1-3 contract */
 export interface CyberDefenseState {
   timestamp: string;
@@ -67,6 +125,8 @@ export interface CyberDefenseState {
   evidence: EvidenceItem[];
   simulation: SimulationData;
   traffic_history?: TrafficDataPoint[];
+  /** Present when the state was derived by the local engine (not a raw API payload). */
+  derivation?: DerivationData;
 }
 
 /** Replay & Demo Stage Metadata */

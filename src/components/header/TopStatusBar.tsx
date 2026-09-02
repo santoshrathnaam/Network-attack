@@ -35,7 +35,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
     : dateObj.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <header className="border-b border-[#E5E5EA] dark:border-[#222733] bg-white/80 dark:bg-[#12141A]/80 backdrop-blur-md sticky top-0 z-30 transition-colors">
+    <header className="border-b border-[#E5E5EA]  bg-paper/80 /80 backdrop-blur-md sticky top-0 z-30 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left: Branding & Core Identity */}
         <div className="flex items-center gap-3.5">
@@ -111,7 +111,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
               className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-lg border transition-all ${
                 isReplayOpen
                   ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100'
-                  : 'bg-white dark:bg-[#151820] text-neutral-700 dark:text-neutral-300 border-[#E5E5EA] dark:border-[#262C38] hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                  : 'bg-paper dark:bg-[#151820] text-neutral-700 dark:text-neutral-300 border-[#E5E5EA] dark:border-[#262C38] hover:bg-neutral-50 dark:hover:bg-neutral-800'
               }`}
             >
               <Radio className="w-3.5 h-3.5" />
@@ -123,7 +123,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
           <button
             onClick={onToggleTheme}
             aria-label="Toggle Theme"
-            className="w-8 h-8 rounded-lg flex items-center justify-center border border-[#E5E5EA] dark:border-[#262C38] bg-white dark:bg-[#151820] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center border border-[#E5E5EA] dark:border-[#262C38] bg-paper dark:bg-[#151820] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>

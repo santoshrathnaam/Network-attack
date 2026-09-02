@@ -44,10 +44,10 @@ export const ReplayControls: React.FC<ReplayControlsProps> = ({
   const currentStage = stages[currentStageIndex] || stages[0];
 
   return (
-    <div className="bg-white dark:bg-[#12141A] border-b border-[#E5E5EA] dark:border-[#222733] py-3 px-4 sm:px-6 lg:px-8 transition-colors">
+    <div className="bg-paper border-b-2 border-ink/10 py-3 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         {/* Left: Stage Badges / Pipeline Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto lg:flex-1 min-w-0 pb-1 lg:pb-0 scrollbar-none">
           {stages.map((stage, idx) => {
             const isActive = idx === currentStageIndex;
             const isPassed = idx < currentStageIndex;
@@ -82,7 +82,7 @@ export const ReplayControls: React.FC<ReplayControlsProps> = ({
         </div>
 
         {/* Right: Media Controls & Utilities */}
-        <div className="flex items-center justify-between w-full lg:w-auto gap-3">
+        <div className="flex items-center justify-between w-full lg:w-auto lg:flex-none gap-3">
           {/* Active Stage Description Tooltip */}
           <div className="hidden xl:block max-w-xs text-xs text-neutral-500 dark:text-neutral-400 truncate">
             <span className="font-semibold text-neutral-700 dark:text-neutral-300">

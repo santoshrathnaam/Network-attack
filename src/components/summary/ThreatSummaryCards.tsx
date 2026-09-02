@@ -5,13 +5,16 @@ import { Badge } from '../common/Badge';
 import { TrendingUp, Clock, AlertTriangle, ShieldCheck, Activity } from 'lucide-react';
 
 interface ThreatSummaryCardsProps {
+  /** Derived recommendation confidence (0-1). Omitted for raw API payloads. */
+  confidence?: number;
   threat: ThreatSummary;
   networkStatus: NetworkStatus;
 }
 
 export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
   threat,
-  networkStatus
+  networkStatus,
+  confidence
 }) => {
   const percentage = Math.round(threat.score * 100);
   const momentumSign = threat.momentum > 0 ? '+' : '';
@@ -20,20 +23,20 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
   // Semantic color styling
   let semanticClass = 'text-emerald-600 dark:text-emerald-400';
   let progressBg = 'bg-emerald-500';
-  let statusDetail = 'All monitored network telemetry is within nominal operational boundaries.';
+  let statusDetail = 'Every measurement is sitting inside its normal range.';
 
   if (networkStatus === 'WATCH') {
     semanticClass = 'text-amber-600 dark:text-amber-400';
     progressBg = 'bg-amber-500';
-    statusDetail = 'Traffic divergence detected. Anomaly score exceeding 1σ baseline deviation.';
+    statusDetail = 'Some readings have drifted outside their usual range.';
   } else if (networkStatus === 'ELEVATED') {
     semanticClass = 'text-orange-600 dark:text-orange-400';
     progressBg = 'bg-orange-500';
-    statusDetail = 'Active port scan and SYN surges observed across distributed ingress nodes.';
+    statusDetail = 'Lots of machines are probing the network at once — someone is looking for a way in.';
   } else if (networkStatus === 'CRITICAL') {
     semanticClass = 'text-rose-600 dark:text-rose-400';
     progressBg = 'bg-rose-500';
-    statusDetail = 'Volumetric saturation imminent. Immediate countermeasure intervention advised.';
+    statusDetail = 'The server is close to being overwhelmed. Act now.';
   }
 
   return (
@@ -59,10 +62,10 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
         <div className="flex items-center gap-6 self-start md:self-auto border-t md:border-t-0 pt-3 md:pt-0 border-neutral-100 dark:border-neutral-800">
           <div className="text-right hidden sm:block">
             <div className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-              AI Forecast Confidence
+              How sure we are
             </div>
             <div className="text-sm font-semibold font-mono text-neutral-800 dark:text-neutral-200">
-              94.2% Conformal
+              {confidence !== undefined ? `${Math.round(confidence * 100)}%` : '—'}
             </div>
           </div>
         </div>
@@ -101,16 +104,16 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
           </div>
 
           <div className="mt-2.5 text-[11px] text-neutral-400 dark:text-neutral-500 flex justify-between">
-            <span>Baseline: 8%</span>
-            <span>Critical threshold: 75%</span>
+            <span>Normal is under 25%</span>
+            <span>Critical at 75%</span>
           </div>
         </Card>
 
-        {/* Metric 2: Threat Momentum */}
+        {/* Metric 2: Is it getting worse? */}
         <Card className="relative overflow-hidden">
           <div className="flex items-center justify-between text-neutral-400 dark:text-neutral-500 mb-1">
             <span className="text-xs font-semibold tracking-wider uppercase">
-              Threat Momentum
+              Is it getting worse?
             </span>
             <TrendingUp className="w-4 h-4 text-neutral-400" />
           </div>
@@ -128,7 +131,7 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
               {momentumFormatted}
             </div>
             <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">
-              Rate of Change
+              right now
             </span>
           </div>
 
@@ -149,7 +152,7 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
           </div>
 
           <div className="mt-2.5 text-[11px] text-neutral-400 dark:text-neutral-500 flex justify-between">
-            <span>Velocity Index</span>
+            <span>Change per minute</span>
             <span className="font-mono">{threat.momentum > 0 ? `+${(threat.momentum * 100).toFixed(1)}/min` : '0.0/min'}</span>
           </div>
         </Card>
@@ -163,9 +166,9 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
             <Clock className="w-4 h-4 text-neutral-400" />
           </div>
 
-          <div className="flex items-baseline justify-between mt-1">
+          <div className="flex items-baseline justify-between gap-2 mt-1">
             <div
-              className={`text-4xl sm:text-5xl font-semibold tracking-tight tabular-nums ${
+              className={`text-4xl sm:text-5xl font-semibold tracking-tight tabular-nums min-w-0 truncate ${
                 threat.time_to_escalation > 0 && threat.time_to_escalation <= 5
                   ? 'text-rose-600 dark:text-rose-400'
                   : threat.time_to_escalation > 5
@@ -173,14 +176,10 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
                   : 'text-neutral-900 dark:text-neutral-50'
               }`}
             >
-              {threat.time_to_escalation > 0
-                ? threat.time_to_escalation === 4
-                  ? '3–5 min'
-                  : `${threat.time_to_escalation} min`
-                : 'Nominal'}
+              {threat.time_to_escalation > 0 ? `${threat.time_to_escalation} min` : 'Stable'}
             </div>
-            <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">
-              Estimated Horizon
+            <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500 flex-none whitespace-nowrap">
+              {threat.time_to_escalation > 0 ? 'until critical' : 'not rising'}
             </span>
           </div>
 
@@ -195,7 +194,7 @@ export const ThreatSummaryCards: React.FC<ThreatSummaryCardsProps> = ({
           </div>
 
           <div className="mt-2.5 text-[11px] text-neutral-400 dark:text-neutral-500 flex justify-between">
-            <span>Confidence Interval</span>
+            <span>Accurate to</span>
             <span className="font-mono">± 45s</span>
           </div>
         </Card>

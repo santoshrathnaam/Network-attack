@@ -205,7 +205,7 @@ export const NetworkTopologyMap: React.FC<NetworkTopologyMapProps> = ({
   }, [selectedAction]);
 
   // SVG Mouse Interaction Handlers for Node Dragging
-  const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement> | MouseEvent) => {
+  const getSVGCoords = useCallback((e: React.MouseEvent | MouseEvent) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = 860 / rect.width;

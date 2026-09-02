@@ -1,52 +1,108 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CyberDefenseState, DataSourceMode, InterventionAction } from './types/cyberDefense';
 import { cyberDefenseApi } from './services/cyberDefenseApi';
 import { replayEngine, PlaybackMode } from './services/replayEngine';
 import { TopStatusBar } from './components/header/TopStatusBar';
 import { ReplayControls } from './components/header/ReplayControls';
 import { ThreatSummaryCards } from './components/summary/ThreatSummaryCards';
+import { PlainSummary } from './components/summary/PlainSummary';
 import { NetworkActivityChart } from './components/charts/NetworkActivityChart';
 import { AttackForecastPanel } from './components/forecast/AttackForecastPanel';
 import { AttackTrajectoryPipeline } from './components/forecast/AttackTrajectoryPipeline';
 import { ExplainabilityPanel } from './components/explainability/ExplainabilityPanel';
+import { SignalMatrix } from './components/explainability/SignalMatrix';
+import { SandboxPanel, SANDBOX_DEFAULTS, type SandboxInputs } from './components/sandbox/SandboxPanel';
+import { applyDynamics } from './services/engine';
+import { stateFromWindows } from './services/stateBuilder';
 import { FutureSimulationPanel } from './components/simulation/FutureSimulationPanel';
 import { ResponseSimulationModal } from './components/simulation/ResponseSimulationModal';
-import { NetworkTopologyMap, TopologyNode, AttackVectorType } from './components/network/NetworkTopologyMap';
-import { NodeInspectorDrawer } from './components/network/NodeInspectorDrawer';
-import { AttackInjectorWidget } from './components/network/AttackInjectorWidget';
 import { Layers, Shield, Cpu, Activity, Sparkles, CheckCircle2 } from 'lucide-react';
+import { SiteView } from './components/site/SiteView';
+import { ScoreTimeline } from './components/charts/ScoreTimeline';
+import { ResponseCards } from './components/simulation/ResponseCards';
+import { DecisionPanel } from './components/decision/DecisionPanel';
+import { DerivationChain } from './components/derivation/DerivationChain';
+import { buildStageState } from './mock/mockDataset';
 
 export function App() {
-  const [state, setState] = useState<CyberDefenseState>(replayEngine.getCurrentStage().state);
+  const [replayState, setReplayState] = useState<CyberDefenseState>(replayEngine.getCurrentStage().state);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(replayEngine.getPlaybackMode());
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(replayEngine.getPlaybackSpeed());
   const [currentStageIndex, setCurrentStageIndex] = useState<number>(replayEngine.getCurrentStageIndex());
   const [dataSource, setDataSource] = useState<DataSourceMode>(cyberDefenseApi.getDataSource());
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  // The product committed to one light editorial language, so the dashboard and
+  // the site can no longer drift apart. Kept as state purely so the existing
+  // header toggle still has something to bind to.
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isSimulationModalOpen, setIsSimulationModalOpen] = useState<boolean>(false);
   const [isReplayDrawerOpen, setIsReplayDrawerOpen] = useState<boolean>(true);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  // Landing on the plain explainer; the operator dashboard is one click away.
+  const [view, setView] = useState<'explain' | 'dashboard'>('explain');
 
-  // Network Topology & Inspector State
-  const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
-  const [activeVector, setActiveVector] = useState<AttackVectorType>('DDOS');
   const [selectedTacticalAction, setSelectedTacticalAction] = useState<InterventionAction>('ISOLATE_SERVER');
+
+  // ---- Live sandbox: operator-driven telemetry -----------------------------
+  const SANDBOX_WINDOWS = 26;
+  const [sandboxOn, setSandboxOn] = useState<boolean>(false);
+  const [sandboxInputs, setSandboxInputs] = useState<SandboxInputs>({ ...SANDBOX_DEFAULTS });
+  const [sandboxHistory, setSandboxHistory] = useState<SandboxInputs[]>(
+    () => Array.from({ length: SANDBOX_WINDOWS }, () => ({ ...SANDBOX_DEFAULTS }))
+  );
+  const inputsRef = useRef(sandboxInputs);
+  inputsRef.current = sandboxInputs;
+
+  // While the sandbox is live it keeps sampling, so the trace scrolls and
+  // acceleration/momentum stay measured from a real stream of windows.
+  useEffect(() => {
+    if (!sandboxOn) return;
+    const id = window.setInterval(() => {
+      setSandboxHistory((h) => [...h.slice(1), { ...inputsRef.current }]);
+    }, 900);
+    return () => window.clearInterval(id);
+  }, [sandboxOn]);
+
+  const handleToggleSandbox = (on: boolean) => {
+    if (on) {
+      // seed a flat history at the current dial positions
+      setSandboxHistory(Array.from({ length: SANDBOX_WINDOWS }, () => ({ ...inputsRef.current })));
+    }
+    setSandboxOn(on);
+    showNotification(on ? 'Sandbox enabled — telemetry is now operator-driven' : 'Sandbox off — back to demo timeline');
+  };
+
+  // Bumped whenever the operator edits the decision model, forcing a re-derive.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  // The newest window is always the live dial position, so dragging updates
+  // instantly rather than waiting for the next sample.
+  const sandboxState = useMemo(() => {
+    if (!sandboxOn) return null;
+    const raw = [...sandboxHistory.slice(1), sandboxInputs].map((i) => ({ ...i }));
+    return stateFromWindows(applyDynamics(raw));
+  }, [sandboxOn, sandboxHistory, sandboxInputs, settingsVersion]);
+
+  // Demo stages are built at import time, so re-derive the current one whenever
+  // the assumptions change. Live-stream mode keeps its own ticking state.
+  const stageKey = replayEngine.getStages()[currentStageIndex]?.key;
+  const derivedStageState = useMemo(() => {
+    if (!stageKey) return null;
+    try { return buildStageState(stageKey); } catch { return null; }
+  }, [stageKey, settingsVersion]);
+
+  const state: CyberDefenseState =
+    sandboxState ??
+    (playbackMode === 'LIVE_STREAM' ? replayState : (derivedStageState ?? replayState));
 
   // Sync theme with HTML document class
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
   // Subscribe to CyberDefenseApi state updates
   useEffect(() => {
     const unsubscribeApi = cyberDefenseApi.subscribe((newState) => {
-      setState(newState);
+      setReplayState(newState);
     });
 
     const unsubscribeReplay = replayEngine.subscribe(() => {
@@ -118,12 +174,6 @@ export function App() {
     showNotification('Intervention Executed: Server Isolated. Risk reduced to 18%.');
   };
 
-  const handleInjectVector = (vector: AttackVectorType, msg: string) => {
-    setActiveVector(vector);
-    if (vector === 'DDOS') setSelectedTacticalAction('NO_ACTION');
-    showNotification(`[SCENARIO INJECTED] ${msg}`);
-  };
-
   const showNotification = (msg: string) => {
     setActionNotice(msg);
     setTimeout(() => {
@@ -133,8 +183,12 @@ export function App() {
 
   const stages = replayEngine.getStages();
 
+  if (view === 'explain') {
+    return <SiteView onOpenDashboard={() => setView('dashboard')} />;
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F5F7] dark:bg-[#090A0C] text-[#1D1D1F] dark:text-[#F5F5F7] transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-paper text-ink font-body">
       {/* Top Status Header */}
       <TopStatusBar
         state={state}
@@ -175,76 +229,143 @@ export function App() {
         </div>
       )}
 
-      {/* Main Command Center Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Section 1: Threat Summary & Key Primary Metrics */}
-        <section aria-label="Threat Summary">
-          <ThreatSummaryCards threat={state.threat} networkStatus={state.network_status} />
+      {/* Main Command Center Layout — ordered as a story, not a wall of panels */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-5 sm:px-8 py-10 space-y-14">
+        <div>
+          <button
+            onClick={() => setView('explain')}
+            data-cursor
+            className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-inkSoft hover:text-signal transition-colors"
+          >
+            ← back to the story
+          </button>
+          <h1 className="mt-5 font-display font-extrabold text-[2.4rem] sm:text-[3.4rem] leading-[0.98] tracking-[-0.03em]">
+            The technical panel
+          </h1>
+          <p className="mt-3 text-lg sm:text-xl text-inkSoft max-w-2xl leading-snug">
+            The same engine, with its working shown. Everything below is measured from
+            the traffic — nothing on this page was typed in.
+          </p>
+        </div>
+
+        {/* 1 — the situation, in words */}
+        <section aria-label="What is happening">
+          <PlainSummary state={state} />
         </section>
 
-        {/* Section 2: Full-Spectrum Network Topology Canvas & Interactive Scenario Injector */}
-        <section aria-label="Interactive Network Topology" className="space-y-4">
-          <NetworkTopologyMap
-            state={state}
-            selectedAction={selectedTacticalAction}
-            activeAttackVector={activeVector}
-            onSelectNode={(node) => setSelectedNode(node)}
-            height="h-[520px]"
-          />
-
-          <AttackInjectorWidget
-            onInjectVector={handleInjectVector}
-            onApplyMitigation={handleApplyMitigation}
-            onResetTopology={handleReset}
+        {/* 2 — the headline numbers */}
+        <section aria-label="Key numbers">
+          <ThreatSummaryCards
+            threat={state.threat}
+            networkStatus={state.network_status}
+            confidence={state.derivation?.decision.confidence}
           />
         </section>
 
-        {/* Section 3: Real-time Traffic Activity & Attack Forecast Distribution */}
-        <section aria-label="Network Activity and Forecast" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: 2 Columns on Desktop for Traffic Chart */}
-          <div className="lg:col-span-2">
+        {/* 3 — is this normal? */}
+        <section aria-label="The four signals">
+          <SectionHead
+            title="The four things we watch"
+            subtitle="A dot inside the green band means that measurement is behaving normally."
+          />
+          <SignalMatrix derivation={state.derivation} />
+        </section>
+
+        {/* 3b — the full audit trail */}
+        <section aria-label="Where the numbers come from">
+          <SectionHead
+            title="Where every number comes from"
+            subtitle="The whole calculation, start to finish, with today's figures in it."
+          />
+          <DerivationChain derivation={state.derivation} />
+        </section>
+
+        {/* 4 — how the score moved */}
+        <section aria-label="Score over time">
+          <SectionHead
+            title="How the score moved"
+            subtitle="The last few minutes. Hover anywhere on the line to read that moment."
+          />
+          <div className="bg-white dark:bg-[#12141A] border border-[#E5E5EA] dark:border-[#222733] rounded-[16px] p-5 shadow-apple dark:shadow-apple-dark">
+            <ScoreTimeline derivation={state.derivation} />
+          </div>
+        </section>
+
+        {/* 5 — what to do */}
+        <section aria-label="What to do">
+          <SectionHead
+            title="What should we do?"
+            subtitle="Each choice played forward five minutes. Lower is better."
+          />
+          <ResponseCards
+            derivation={state.derivation}
+            onChoose={(a) => setSelectedTacticalAction(a as InterventionAction)}
+          />
+        </section>
+
+        {/* 5b — how that decision was actually reached, and its levers */}
+        <section aria-label="How the decision is made">
+          <SectionHead
+            title="How is that decision made?"
+            subtitle="The arithmetic behind each option — and the assumptions you can argue with."
+          />
+          <DecisionPanel
+            derivation={state.derivation}
+            onChange={() => setSettingsVersion((v) => v + 1)}
+          />
+        </section>
+
+        {/* 6 — take the controls */}
+        <section aria-label="Live Sandbox">
+          <SectionHead
+            title="Try it yourself"
+            subtitle="Drive the network by hand and watch every number above react."
+          />
+          <SandboxPanel
+            enabled={sandboxOn}
+            inputs={sandboxInputs}
+            onToggle={handleToggleSandbox}
+            onChange={setSandboxInputs}
+            streaming={sandboxOn}
+          />
+        </section>
+
+        {/* 7 — everything technical, folded away until asked for */}
+        <details className="group rounded-[16px] border border-[#E5E5EA] dark:border-[#222733] bg-white dark:bg-[#12141A] overflow-hidden">
+          <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between select-none">
+            <span>
+              <span className="font-semibold text-neutral-800 dark:text-neutral-100">Technical details</span>
+              <span className="block text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                The maths, the attack classifier and the kill-chain
+              </span>
+            </span>
+            <span className="text-xs font-mono text-neutral-400 group-open:hidden">show</span>
+            <span className="text-xs font-mono text-neutral-400 hidden group-open:inline">hide</span>
+          </summary>
+
+          <div className="px-5 pb-5 space-y-6 border-t border-[#F0F0F3] dark:border-[#1E232E] pt-5">
+            <ExplainabilityPanel evidence={state.evidence} derivation={state.derivation} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AttackForecastPanel forecast={state.forecast} />
+              <AttackTrajectoryPipeline trajectory={state.trajectory} />
+            </div>
+
             <NetworkActivityChart
               trafficData={state.traffic_history}
               currentStatus={state.network_status}
             />
-          </div>
 
-          {/* Right: 1 Column on Desktop for Attack Probability Forecast */}
-          <div className="lg:col-span-1">
-            <AttackForecastPanel forecast={state.forecast} />
-          </div>
-        </section>
-
-        {/* Section 4: Attack Trajectory Progression Stepper */}
-        <section aria-label="Attack Trajectory">
-          <AttackTrajectoryPipeline trajectory={state.trajectory} />
-        </section>
-
-        {/* Section 5: Explainability & Future Simulation Panels */}
-        <section aria-label="Explainability and Simulation" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Why this forecast? */}
-          <div>
-            <ExplainabilityPanel evidence={state.evidence} />
-          </div>
-
-          {/* Right: Counterfactual Future Simulation */}
-          <div>
             <FutureSimulationPanel
               simulation={state.simulation}
               state={state}
               onSimulateClick={() => setIsSimulationModalOpen(true)}
               onSelectAction={(action) => setSelectedTacticalAction(action)}
             />
-          </div>
-        </section>
-      </main>
 
-      {/* Slide-Out Node Telemetry Inspector Drawer */}
-      <NodeInspectorDrawer
-        node={selectedNode}
-        onClose={() => setSelectedNode(null)}
-        onApplyAction={(act) => showNotification(`[POLICY APPLIED] ${act}`)}
-      />
+          </div>
+        </details>
+      </main>
 
       {/* Counterfactual Response Simulation Modal Flow */}
       <ResponseSimulationModal
@@ -276,6 +397,15 @@ export function App() {
     </div>
   );
 }
+
+const SectionHead: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <div className="mb-5">
+    <h2 className="font-display font-extrabold text-2xl sm:text-3xl leading-[1.05] tracking-[-0.02em] text-ink">
+      {title}
+    </h2>
+    {subtitle && <p className="text-base text-inkSoft mt-1.5 max-w-2xl leading-snug">{subtitle}</p>}
+  </div>
+);
 
 export default App;
 
