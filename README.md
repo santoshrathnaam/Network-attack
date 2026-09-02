@@ -1,4 +1,4 @@
-# SIH26153 — Predictive Cyber Defence
+# SIH26153 Predictive Cyber Defence
 
 Built for NTRO / Smart India Hackathon problem statement SIH26153.
 
